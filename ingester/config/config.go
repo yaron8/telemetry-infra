@@ -24,7 +24,7 @@ func NewConfig() *Config {
 		Redis: RedisConfig{
 			Host: "localhost",
 			Port: 6379,
-			TTL:  10 * time.Second,
+			TTL:  30 * time.Second,
 		},
 		ETL: ETLConfig{
 			Interval: 10 * time.Second,
