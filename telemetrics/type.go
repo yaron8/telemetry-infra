@@ -9,5 +9,10 @@ type MetricRecord struct {
 }
 
 func GetCSVHeader() []string {
-	return []string{"timestamp", "switch_id", "bandwidth_mbps", "latency_ms", "packet_errors"}
+	return []string{
+		"timestamp",
+		"switch_id",
+		"bandwidth_mbps",
+		"latency_ms",
+		"packet_errors"}
 }

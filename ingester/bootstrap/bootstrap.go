@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -78,8 +79,26 @@ func (b *Bootstrap) ListMetricsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	allKeysAndMetrics, err := b.dao.GetAll(context.Background())
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error retrieving metrics: %v", err),
+			http.StatusInternalServerError)
+		return
+	}
+
+	// Set content type to JSON
+	w.Header().Set("Content-Type", "application/json")
+
+	// Marshal the metrics to JSON
+	jsonData, err := json.Marshal(allKeysAndMetrics)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error encoding metrics to JSON: %v", err),
+			http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("hello ListMetrics"))
+	w.Write(jsonData)
 }
 
 func (b *Bootstrap) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
@@ -147,7 +166,7 @@ func (b *Bootstrap) WriteMetricsLineByLine(respBody io.ReadCloser) error {
 		}
 
 		// Store the metric using the DAO
-		if err := b.dao.Store(ctx, record.SwitchID, record); err != nil {
+		if err := b.dao.AddKey(ctx, record.SwitchID, record); err != nil {
 			fmt.Printf("Error storing metric at line %d: %v\n", lineNumber, err)
 			continue
 		}

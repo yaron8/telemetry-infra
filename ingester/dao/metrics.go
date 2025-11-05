@@ -3,6 +3,7 @@ package dao
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -23,12 +24,48 @@ func NewDAOMetrics(redisClient *redis.Client, ttl time.Duration) *DAOMetrics {
 	}
 }
 
-// Store saves a MetricRecord to Redis with the given key
-func (dao *DAOMetrics) Store(ctx context.Context, key string, record telemetrics.MetricRecord) error {
+// AddKey saves a MetricRecord to Redis with the given key
+func (dao *DAOMetrics) AddKey(ctx context.Context, key string, record telemetrics.MetricRecord) error {
 	data, err := json.Marshal(record)
 	if err != nil {
 		return err
 	}
 
 	return dao.redisClient.Set(ctx, key, data, dao.ttl).Err()
+}
+
+// GetAll retrieves all metrics from Redis and returns them as a slice of maps
+// Each map contains a single key-value pair where the key is the Redis key
+// and the value is the MetricRecord
+func (dao *DAOMetrics) GetAll(ctx context.Context) ([]map[string]telemetrics.MetricRecord, error) {
+	// Get all keys matching the metric pattern
+	keys, err := dao.redisClient.Keys(ctx, "*").Result()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]map[string]telemetrics.MetricRecord, 0, len(keys))
+
+	for _, key := range keys {
+		// Get the value for this key
+		data, err := dao.redisClient.Get(ctx, key).Result()
+		if err != nil {
+			fmt.Printf("Error fetching key %s: %v\n", key, err)
+			continue
+		}
+
+		// Parse the JSON data into MetricRecord
+		var record telemetrics.MetricRecord
+		if err := json.Unmarshal([]byte(data), &record); err != nil {
+			fmt.Printf("Error parsing MetricRecord for key %s: %v\n", key, err)
+			continue
+		}
+
+		// Add to result as a map with single key-value pair
+		result = append(result, map[string]telemetrics.MetricRecord{
+			key: record,
+		})
+	}
+
+	return result, nil
 }
