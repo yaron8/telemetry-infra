@@ -1,0 +1,2 @@
+timestamp, switch_ame, bandwidth_mbps, latency_ms, packet_errors
+1234,sw1,200,5,3
