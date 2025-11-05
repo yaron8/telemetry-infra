@@ -1,9 +1,10 @@
 package bootstrap
 
 import (
+	"context"
 	"fmt"
-	"log"
 	"net/http"
+	"time"
 
 	"github.com/yaron8/telemetry-infra/generator/config"
 	"github.com/yaron8/telemetry-infra/generator/metrics"
@@ -12,6 +13,7 @@ import (
 type Bootstrap struct {
 	csvMetrics *metrics.CSVMetrics
 	config     *config.Config
+	server     *http.Server
 }
 
 func NewBootstrap() (*Bootstrap, error) {
@@ -24,17 +26,30 @@ func NewBootstrap() (*Bootstrap, error) {
 	}, nil
 }
 
-// StartServer initializes and starts the HTTP server on port 9001
+// StartServer initializes and starts the HTTP server
 func (b *Bootstrap) StartServer() error {
-	// Set up HTTP handlers
-	http.HandleFunc("/counters", b.countersHandler)
+	mux := http.NewServeMux()
 
-	serverPort := fmt.Sprintf(":%d", b.config.Port)
-	// Start the server
-	fmt.Printf("Starting HTTP server on port %s\n", serverPort)
-	if err := http.ListenAndServe(serverPort, nil); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
-		return err
+	// Health check endpoint
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	// Set up HTTP handlers
+	mux.HandleFunc("/counters", b.countersHandler)
+
+	b.server = &http.Server{
+		Addr:         fmt.Sprintf(":%d", b.config.Port),
+		Handler:      mux,
+		ReadTimeout:  60 * time.Second,
+		WriteTimeout: 60 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	fmt.Printf("Starting server on port %d\n", b.config.Port)
+	if err := b.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("failed to start server: %w", err)
 	}
 
 	return nil
@@ -50,4 +65,14 @@ func (b *Bootstrap) countersHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/csv")
 	fmt.Fprint(w, csvData)
+}
+
+// Shutdown gracefully stops the HTTP server
+func (b *Bootstrap) Shutdown(ctx context.Context) error {
+	if b.server == nil {
+		return nil
+	}
+
+	fmt.Println("Shutting down server...")
+	return b.server.Shutdown(ctx)
 }
