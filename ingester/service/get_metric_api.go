@@ -40,5 +40,7 @@ func (api *APIServer) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write(jsonData)
+	if _, err := w.Write(jsonData); err != nil {
+		fmt.Printf("Error writing response: %v\n", err)
+	}
 }

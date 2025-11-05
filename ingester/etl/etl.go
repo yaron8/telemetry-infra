@@ -26,7 +26,7 @@ func NewETL(dao *dao.DAOMetrics, interval time.Duration) *ETL {
 	}
 }
 
-func (etl *ETL) Run() error {
+func (etl *ETL) Run() {
 	for {
 		if err := etl.updateMetrics(); err != nil {
 			fmt.Printf("Error updating metrics: %v\n", err)
@@ -49,7 +49,9 @@ func (etl *ETL) updateMetrics() error {
 	case http.StatusNotModified:
 		fmt.Println("304 - skip")
 	case http.StatusOK:
-		etl.writeMetricsLineByLine(resp.Body)
+		if err := etl.writeMetricsLineByLine(resp.Body); err != nil {
+			return fmt.Errorf("failed to write metrics: %w", err)
+		}
 	default:
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
@@ -64,8 +66,9 @@ func (etl *ETL) writeMetricsLineByLine(respBody io.ReadCloser) error {
 	ctx := context.Background()
 
 	// Skip the header line
-	if scanner.Scan() {
-		// header line is skipped
+	if !scanner.Scan() {
+		// No data to read
+		return nil
 	}
 
 	lineNumber := 1

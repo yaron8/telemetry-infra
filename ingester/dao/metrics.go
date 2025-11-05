@@ -65,10 +65,8 @@ func (dao *DAOMetrics) GetAll(ctx context.Context) ([]map[string]telemetrics.Met
 		cmds[i] = pipe.Get(ctx, key)
 	}
 
-	_, err := pipe.Exec(ctx)
-	if err != nil && err != redis.Nil {
-		// Continue even if some keys fail
-	}
+	// Execute pipeline - errors are handled per-command below
+	_, _ = pipe.Exec(ctx)
 
 	// Pre-allocate result slice
 	result := make([]map[string]telemetrics.MetricRecord, 0, len(keys))

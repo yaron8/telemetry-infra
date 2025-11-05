@@ -55,7 +55,9 @@ func (b *Bootstrap) Start() error {
 		b.config.ETL.Interval,
 	)
 
-	go etl.Run()
+	go func() {
+		etl.Run()
+	}()
 
 	return b.apiServer.Start()
 }
