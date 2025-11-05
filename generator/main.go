@@ -36,7 +36,7 @@ func main() {
 	currentTime := time.Now().Unix()
 
 	// Generate numOfDataLines lines of data
-	for i := 0; i < numOfDataLines; i++ {
+	for i := range numOfDataLines {
 		// Generate random metrics data
 		metric := metrics.Metric{
 			Timestamp:     currentTime,
