@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yaron8/telemetry-infra/metrics"
+	"github.com/yaron8/telemetry-infra/telemetrics"
 )
 
 const numOfDataLines = 100
@@ -61,7 +61,7 @@ func (cm *CSVMetrics) GetCSVMetrics() (*CSVMetricsResponse, error) {
 	writer := csv.NewWriter(&buf)
 
 	// Write header
-	header := []string{"timestamp", "switch_id", "bandwidth_mbps", "latency_ms", "packet_errors"}
+	header := telemetrics.GetCSVHeader()
 	if err := writer.Write(header); err != nil {
 		return nil, fmt.Errorf("error writing header: %w", err)
 	}
@@ -72,7 +72,7 @@ func (cm *CSVMetrics) GetCSVMetrics() (*CSVMetricsResponse, error) {
 	// Generate numOfDataLines lines of data
 	for i := 1; i <= numOfDataLines; i++ {
 		// Generate random metrics data
-		metric := metrics.Metric{
+		metric := telemetrics.MetricRecord{
 			Timestamp:     currentTime,
 			SwitchID:      fmt.Sprintf("sw%d", i),
 			BandwidthMbps: rand.Float64() * 10000, // Random bandwidth up to 10 Gbps

@@ -2,15 +2,19 @@ package bootstrap
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/yaron8/telemetry-infra/ingester/config"
+	"github.com/yaron8/telemetry-infra/ingester/metrics"
 )
 
 type Bootstrap struct {
-	config *config.Config
-	server *http.Server
+	config  *config.Config
+	server  *http.Server
+	metrics metrics.Metrics
 }
 
 func NewBootstrap() (*Bootstrap, error) {
@@ -24,6 +28,14 @@ func NewBootstrap() (*Bootstrap, error) {
 
 // Start initializes and starts the HTTP server
 func (b *Bootstrap) Start() error {
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     fmt.Sprintf("%s:%d", b.config.Redis.Host, b.config.Redis.Port),
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+
+	b.metrics = *metrics.NewMetrics(redisClient, b.config.Redis.TTL)
+
 	mux := http.NewServeMux()
 
 	// Health check endpoint
@@ -92,10 +104,15 @@ func (b *Bootstrap) updateMetrics() error {
 	case http.StatusNotModified:
 		fmt.Println("304 - skip")
 	case http.StatusOK:
-		fmt.Println("200 - ok")
+		b.WriteMetricsLineByLine(resp.Body)
 	default:
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
+	return nil
+}
+
+func (b *Bootstrap) WriteMetricsLineByLine(respBody io.ReadCloser) error {
+	fmt.Println("Writing metrics..")
 	return nil
 }
