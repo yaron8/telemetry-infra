@@ -8,13 +8,13 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/yaron8/telemetry-infra/ingester/config"
-	"github.com/yaron8/telemetry-infra/ingester/metrics"
+	"github.com/yaron8/telemetry-infra/ingester/dao"
 )
 
 type Bootstrap struct {
-	config  *config.Config
-	server  *http.Server
-	metrics metrics.Metrics
+	config *config.Config
+	server *http.Server
+	dao    dao.DAOMetrics
 }
 
 func NewBootstrap() (*Bootstrap, error) {
@@ -34,7 +34,7 @@ func (b *Bootstrap) Start() error {
 		DB:       0,  // use default DB
 	})
 
-	b.metrics = *metrics.NewMetrics(redisClient, b.config.Redis.TTL)
+	b.dao = *dao.NewDAOMetrics(redisClient, b.config.Redis.TTL)
 
 	mux := http.NewServeMux()
 
