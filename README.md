@@ -27,10 +27,10 @@ hey -n 5000 -c 50 http://localhost:8080/telemetry/ListMetrics
 
 ```
 Summary:
-  Total:	1.5811 secs
-  Slowest:	0.0586 secs
-  Fastest:	0.0024 secs
-  Average:	0.0156 secs
+  Total:	1.5811 secs (1581.1 ms)
+  Slowest:	0.0586 secs (58.6 ms)
+  Fastest:	0.0024 secs (2.4 ms)
+  Average:	0.0156 secs (15.6 ms)
   Requests/sec:	3162.3278
 
 Response time histogram:
@@ -80,10 +80,10 @@ hey -n 5000 -c 50 "http://localhost:8080/telemetry/GetMetric?switch_id=sw5&metri
 
 ```
 Summary:
-  Total:	0.3281 secs
-  Slowest:	0.0130 secs
-  Fastest:	0.0008 secs
-  Average:	0.0032 secs
+  Total:	0.3281 secs (328.1 ms)
+  Slowest:	0.0130 secs (13 ms)
+  Fastest:	0.0008 secs (0.8 ms)
+  Average:	0.0032 secs (3.2 ms)
   Requests/sec:	15237.1506
 
   Total data:	30000 bytes
