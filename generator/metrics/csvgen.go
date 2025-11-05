@@ -51,7 +51,7 @@ func (cm *CSVMetrics) GetCSVMetrics() (string, error) {
 	writer := csv.NewWriter(&buf)
 
 	// Write header
-	header := []string{"timestamp", "switch_ame", "bandwidth_mbps", "latency_ms", "packet_errors"}
+	header := []string{"timestamp", "switch_id", "bandwidth_mbps", "latency_ms", "packet_errors"}
 	if err := writer.Write(header); err != nil {
 		return "", fmt.Errorf("error writing header: %w", err)
 	}
@@ -64,7 +64,7 @@ func (cm *CSVMetrics) GetCSVMetrics() (string, error) {
 		// Generate random metrics data
 		metric := metrics.Metric{
 			Timestamp:     currentTime,
-			SwitchName:    fmt.Sprintf("sw%d", i),
+			SwitchID:      fmt.Sprintf("sw%d", i),
 			BandwidthMbps: rand.Float64() * 10000, // Random bandwidth up to 10 Gbps
 			LatencyMs:     rand.Float64() * 100,   // Random latency up to 100ms
 			PacketErrors:  rand.Intn(1000),        // Random packet errors up to 1000
@@ -72,7 +72,7 @@ func (cm *CSVMetrics) GetCSVMetrics() (string, error) {
 
 		row := []string{
 			fmt.Sprintf("%d", metric.Timestamp),
-			metric.SwitchName,
+			metric.SwitchID,
 			fmt.Sprintf("%.2f", metric.BandwidthMbps),
 			fmt.Sprintf("%.2f", metric.LatencyMs),
 			fmt.Sprintf("%d", metric.PacketErrors),

@@ -59,10 +59,10 @@ func ListMetricsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetMetricHandler(w http.ResponseWriter, r *http.Request) {
-	switchName := r.URL.Query().Get("switch_name")
+	switchID := r.URL.Query().Get("switch_id")
 	metric := r.URL.Query().Get("metric")
 
-	response := fmt.Sprintf("switch_name: %s, metric: %s", switchName, metric)
+	response := fmt.Sprintf("switch_id: %s, metric: %s", switchID, metric)
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(response))
 }

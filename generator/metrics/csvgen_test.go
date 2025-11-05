@@ -53,7 +53,7 @@ func TestGetCSVMetrics_CSVFormat(t *testing.T) {
 	// Check header
 	expectedHeader := []string{
 		"timestamp",
-		"switch_ame",
+		"switch_id",
 		"bandwidth_mbps",
 		"latency_ms",
 		"packet_errors",
