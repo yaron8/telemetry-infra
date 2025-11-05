@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/csv"
 	"fmt"
 	"math/rand"
@@ -13,37 +14,37 @@ import (
 const numOfDataLines = 100
 
 func main() {
-	// Create or open the CSV file
-	file, err := os.Create("generator/csv_metrics/metrics.csv")
+	csvData, err := GetCSVMetrics()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating file: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(os.Stderr, "Error generating CSV: %v\n", err)
+		return
 	}
-	defer file.Close()
+	fmt.Print(csvData)
+}
 
-	// Create CSV writer
-	writer := csv.NewWriter(file)
-	defer writer.Flush()
+func GetCSVMetrics() (string, error) {
+	// Create a buffer to write CSV data to
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
 
-	// Write header with exact format requested (note: "switch_ame" appears to be intentional typo from original)
+	// Write header
 	header := []string{"timestamp", "switch_ame", "bandwidth_mbps", "latency_ms", "packet_errors"}
 	if err := writer.Write(header); err != nil {
-		fmt.Fprintf(os.Stderr, "Error writing header: %v\n", err)
-		os.Exit(1)
+		return "", fmt.Errorf("error writing header: %w", err)
 	}
 
 	// Get current timestamp
 	currentTime := time.Now().Unix()
 
 	// Generate numOfDataLines lines of data
-	for i := range numOfDataLines {
+	for i := 1; i <= numOfDataLines; i++ {
 		// Generate random metrics data
 		metric := metrics.Metric{
 			Timestamp:     currentTime,
-			SwitchName:    fmt.Sprintf("sw%d", i+1),
+			SwitchName:    fmt.Sprintf("sw%d", i),
 			BandwidthMbps: rand.Float64() * 10000, // Random bandwidth up to 10 Gbps
-			LatencyMs:     rand.Float64() * 1500,  // Random latency up to 15000ms
-			PacketErrors:  rand.Intn(10),          // Random packet errors up to 1000
+			LatencyMs:     rand.Float64() * 100,   // Random latency up to 100ms
+			PacketErrors:  rand.Intn(1000),        // Random packet errors up to 1000
 		}
 
 		row := []string{
@@ -55,10 +56,15 @@ func main() {
 		}
 
 		if err := writer.Write(row); err != nil {
-			fmt.Fprintf(os.Stderr, "Error writing row: %v\n", err)
-			os.Exit(1)
+			return "", fmt.Errorf("error writing row: %w", err)
 		}
 	}
 
-	fmt.Println("CSV file generated successfully at metrics.csv")
+	// Flush the writer to ensure all data is written to the buffer
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return "", fmt.Errorf("error flushing writer: %w", err)
+	}
+
+	return buf.String(), nil
 }
