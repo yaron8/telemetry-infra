@@ -12,23 +12,25 @@ import (
 )
 
 const numOfDataLines = 100
-const cacheDuration = 10 * time.Second
 
 type CSVMetrics struct {
 	mu            sync.RWMutex
 	cachedData    string
 	cacheTime     time.Time
+	cacheDuration time.Duration
 }
 
-func NewCSVMetrics() *CSVMetrics {
-	return &CSVMetrics{}
+func NewCSVMetrics(cacheDuration time.Duration) *CSVMetrics {
+	return &CSVMetrics{
+		cacheDuration: cacheDuration,
+	}
 }
 
-// GetCSVMetrics generates CSV formatted metrics data with 10-second caching
+// GetCSVMetrics generates CSV formatted metrics data with caching
 func (cm *CSVMetrics) GetCSVMetrics() (string, error) {
-	// Check if cache is valid (less than 10 seconds old)
+	// Check if cache is valid
 	cm.mu.RLock()
-	if time.Since(cm.cacheTime) < cacheDuration && cm.cachedData != "" {
+	if time.Since(cm.cacheTime) < cm.cacheDuration && cm.cachedData != "" {
 		cachedData := cm.cachedData
 		cm.mu.RUnlock()
 		return cachedData, nil
@@ -40,7 +42,7 @@ func (cm *CSVMetrics) GetCSVMetrics() (string, error) {
 	defer cm.mu.Unlock()
 
 	// Double-check after acquiring write lock (another goroutine might have updated it)
-	if time.Since(cm.cacheTime) < cacheDuration && cm.cachedData != "" {
+	if time.Since(cm.cacheTime) < cm.cacheDuration && cm.cachedData != "" {
 		return cm.cachedData, nil
 	}
 

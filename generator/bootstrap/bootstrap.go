@@ -5,19 +5,23 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/yaron8/telemetry-infra/generator/config"
 	"github.com/yaron8/telemetry-infra/generator/metrics"
 )
 
-const serverPort = ":9001"
-
 type Bootstrap struct {
 	csvMetrics *metrics.CSVMetrics
+	config     *config.Config
 }
 
-func NewBootstrap() *Bootstrap {
+func NewBootstrap() (*Bootstrap, error) {
+	// Load configuration
+	cfg := config.NewConfig()
+
 	return &Bootstrap{
-		csvMetrics: metrics.NewCSVMetrics(),
-	}
+		csvMetrics: metrics.NewCSVMetrics(cfg.CacheTTL),
+		config:     cfg,
+	}, nil
 }
 
 // StartServer initializes and starts the HTTP server on port 9001
@@ -25,6 +29,7 @@ func (b *Bootstrap) StartServer() error {
 	// Set up HTTP handlers
 	http.HandleFunc("/counters", b.countersHandler)
 
+	serverPort := fmt.Sprintf(":%d", b.config.Port)
 	// Start the server
 	fmt.Printf("Starting HTTP server on port %s\n", serverPort)
 	if err := http.ListenAndServe(serverPort, nil); err != nil {

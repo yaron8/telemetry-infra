@@ -1,9 +1,16 @@
 package main
 
-import "github.com/yaron8/telemetry-infra/generator/bootstrap"
+import (
+	"log"
+
+	"github.com/yaron8/telemetry-infra/generator/bootstrap"
+)
 
 func main() {
-	bootstrap := bootstrap.NewBootstrap()
+	bootstrap, err := bootstrap.NewBootstrap()
+	if err != nil {
+		log.Fatalf("Failed to create bootstrap: %v", err)
+	}
 
 	if err := bootstrap.StartServer(); err != nil {
 		panic(err)
