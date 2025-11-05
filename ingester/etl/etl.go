@@ -58,7 +58,7 @@ func (etl *ETL) updateMetrics() error {
 }
 
 func (etl *ETL) writeMetricsLineByLine(respBody io.ReadCloser) error {
-	fmt.Println("Writing metrics..")
+	fmt.Println("Pulling metrics from service Generator..")
 
 	scanner := bufio.NewScanner(respBody)
 	ctx := context.Background()

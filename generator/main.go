@@ -12,7 +12,7 @@ func main() {
 		log.Fatalf("Failed to create bootstrap: %v", err)
 	}
 
-	if err := bootstrap.StartServer(); err != nil {
+	if err := bootstrap.Start(); err != nil {
 		panic(err)
 	}
 }
