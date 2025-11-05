@@ -18,17 +18,26 @@ import (
 )
 
 type Bootstrap struct {
-	config *config.Config
-	server *http.Server
-	dao    dao.DAOMetrics
+	config         *config.Config
+	server         *http.Server
+	dao            dao.DAOMetrics
+	allowedMetrics map[string]bool
 }
 
 func NewBootstrap() (*Bootstrap, error) {
 	// Load configuration
 	cfg := config.NewConfig()
 
+	allowedMetrics := map[string]bool{}
+	for _, metric := range telemetrics.GetCSVHeader() {
+		if metric != "switch_id" {
+			allowedMetrics[metric] = true
+		}
+	}
+
 	return &Bootstrap{
-		config: cfg,
+		config:         cfg,
+		allowedMetrics: allowedMetrics,
 	}, nil
 }
 
@@ -110,9 +119,19 @@ func (b *Bootstrap) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switchID := r.URL.Query().Get("switch_id")
+	if switchID == "" {
+		http.Error(w, "Missing switch_id parameter", http.StatusBadRequest)
+		return
+	}
+
 	metric := r.URL.Query().Get("metric")
+	if metric == "" {
+		http.Error(w, "Missing metric parameter", http.StatusBadRequest)
+		return
+	}
 
 	response := fmt.Sprintf("switch_id: %s, metric: %s", switchID, metric)
+
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(response))
 }
@@ -159,14 +178,14 @@ func (b *Bootstrap) WriteMetricsLineByLine(respBody io.ReadCloser) error {
 		}
 
 		// Parse the CSV line into a MetricRecord
-		record, err := parseCSVLine(line)
+		switchID, record, err := parseCSVLine(line)
 		if err != nil {
 			fmt.Printf("Error parsing line %d: %v\n", lineNumber, err)
 			continue
 		}
 
 		// Store the metric using the DAO
-		if err := b.dao.AddKey(ctx, record.SwitchID, record); err != nil {
+		if err := b.dao.AddKey(ctx, switchID, record); err != nil {
 			fmt.Printf("Error storing metric at line %d: %v\n", lineNumber, err)
 			continue
 		}
@@ -180,43 +199,39 @@ func (b *Bootstrap) WriteMetricsLineByLine(respBody io.ReadCloser) error {
 }
 
 // parseCSVLine parses a CSV line into a MetricRecord
-// Expected format: timestamp,switch_id,bandwidth_mbps,latency_ms,packet_errors
-func parseCSVLine(line string) (telemetrics.MetricRecord, error) {
+// Expected format: switch_id,bandwidth_mbps,latency_ms,packet_errors
+func parseCSVLine(line string) (string, telemetrics.MetricRecord, error) {
 	fields := strings.Split(line, ",")
 
-	if len(fields) != 5 {
-		return telemetrics.MetricRecord{}, fmt.Errorf("expected 5 fields, got %d", len(fields))
-	}
-
-	// Parse timestamp
-	timestamp, err := strconv.ParseInt(strings.TrimSpace(fields[0]), 10, 64)
-	if err != nil {
-		return telemetrics.MetricRecord{}, fmt.Errorf("invalid timestamp: %w", err)
+	if len(fields) != 4 {
+		return "", telemetrics.MetricRecord{}, fmt.Errorf("expected 4 fields, got %d", len(fields))
 	}
 
 	// Parse bandwidth_mbps
-	bandwidthMbps, err := strconv.ParseFloat(strings.TrimSpace(fields[2]), 64)
+	bandwidthMbps, err := strconv.ParseFloat(strings.TrimSpace(fields[1]), 64)
 	if err != nil {
-		return telemetrics.MetricRecord{}, fmt.Errorf("invalid bandwidth_mbps: %w", err)
+		return "", telemetrics.MetricRecord{}, fmt.Errorf("invalid bandwidth_mbps: %w", err)
 	}
 
 	// Parse latency_ms
-	latencyMs, err := strconv.ParseFloat(strings.TrimSpace(fields[3]), 64)
+	latencyMs, err := strconv.ParseFloat(strings.TrimSpace(fields[2]), 64)
 	if err != nil {
-		return telemetrics.MetricRecord{}, fmt.Errorf("invalid latency_ms: %w", err)
+		return "", telemetrics.MetricRecord{}, fmt.Errorf("invalid latency_ms: %w", err)
 	}
 
 	// Parse packet_errors
-	packetErrors, err := strconv.Atoi(strings.TrimSpace(fields[4]))
+	packetErrors, err := strconv.Atoi(strings.TrimSpace(fields[3]))
 	if err != nil {
-		return telemetrics.MetricRecord{}, fmt.Errorf("invalid packet_errors: %w", err)
+		return "", telemetrics.MetricRecord{}, fmt.Errorf("invalid packet_errors: %w", err)
 	}
 
-	return telemetrics.MetricRecord{
-		Timestamp:     timestamp,
-		SwitchID:      strings.TrimSpace(fields[1]),
-		BandwidthMbps: bandwidthMbps,
-		LatencyMs:     latencyMs,
-		PacketErrors:  packetErrors,
-	}, nil
+	switchID := strings.TrimSpace(fields[0])
+
+	return switchID,
+		telemetrics.MetricRecord{
+
+			BandwidthMbps: bandwidthMbps,
+			LatencyMs:     latencyMs,
+			PacketErrors:  packetErrors,
+		}, nil
 }
