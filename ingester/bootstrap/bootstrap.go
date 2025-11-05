@@ -1,7 +1,6 @@
 package bootstrap
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -65,14 +64,4 @@ func GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 	response := fmt.Sprintf("switch_id: %s, metric: %s", switchID, metric)
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(response))
-}
-
-// Shutdown gracefully stops the HTTP server
-func (b *Bootstrap) Shutdown(ctx context.Context) error {
-	if b.server == nil {
-		return nil
-	}
-
-	fmt.Println("Shutting down server...")
-	return b.server.Shutdown(ctx)
 }

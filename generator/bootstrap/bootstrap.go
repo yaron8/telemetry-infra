@@ -1,7 +1,6 @@
 package bootstrap
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -57,22 +56,14 @@ func (b *Bootstrap) StartServer() error {
 
 // countersHandler handles the /counters endpoint
 func (b *Bootstrap) countersHandler(w http.ResponseWriter, r *http.Request) {
-	csvData, err := b.csvMetrics.GetCSVMetrics()
+	csvMetricsResponse, err := b.csvMetrics.GetCSVMetrics()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error generating CSV metrics: %v", err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Error generating CSV metrics: %v", err),
+			http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/csv")
-	fmt.Fprint(w, csvData)
-}
-
-// Shutdown gracefully stops the HTTP server
-func (b *Bootstrap) Shutdown(ctx context.Context) error {
-	if b.server == nil {
-		return nil
-	}
-
-	fmt.Println("Shutting down server...")
-	return b.server.Shutdown(ctx)
+	w.WriteHeader(csvMetricsResponse.HTTPResponseCode)
+	fmt.Fprint(w, csvMetricsResponse.CSVData)
 }

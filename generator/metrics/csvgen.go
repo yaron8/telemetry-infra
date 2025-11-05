@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"sync"
 	"time"
 
@@ -15,9 +16,13 @@ const numOfDataLines = 100
 
 type CSVMetrics struct {
 	mu                      sync.RWMutex
-	snapshot                string
 	snapshotLastTimeUpdated time.Time
 	snapshotTTL             time.Duration
+}
+
+type CSVMetricsResponse struct {
+	CSVData          string
+	HTTPResponseCode int
 }
 
 func NewCSVMetrics(snapshotTTL time.Duration) *CSVMetrics {
@@ -27,13 +32,15 @@ func NewCSVMetrics(snapshotTTL time.Duration) *CSVMetrics {
 }
 
 // GetCSVMetrics generates CSV formatted metrics data with caching
-func (cm *CSVMetrics) GetCSVMetrics() (string, error) {
+func (cm *CSVMetrics) GetCSVMetrics() (*CSVMetricsResponse, error) {
 	// Check if snapshot is valid
 	cm.mu.RLock()
-	if time.Since(cm.snapshotLastTimeUpdated) < cm.snapshotTTL && cm.snapshot != "" {
-		snapshot := cm.snapshot
+	if time.Since(cm.snapshotLastTimeUpdated) < cm.snapshotTTL {
 		cm.mu.RUnlock()
-		return snapshot, nil
+		return &CSVMetricsResponse{
+			CSVData:          "",
+			HTTPResponseCode: http.StatusNotModified,
+		}, nil
 	}
 	cm.mu.RUnlock()
 
@@ -42,8 +49,11 @@ func (cm *CSVMetrics) GetCSVMetrics() (string, error) {
 	defer cm.mu.Unlock()
 
 	// Double-check after acquiring write lock (another goroutine might have updated it)
-	if time.Since(cm.snapshotLastTimeUpdated) < cm.snapshotTTL && cm.snapshot != "" {
-		return cm.snapshot, nil
+	if time.Since(cm.snapshotLastTimeUpdated) < cm.snapshotTTL {
+		return &CSVMetricsResponse{
+			CSVData:          "",
+			HTTPResponseCode: http.StatusOK,
+		}, nil
 	}
 
 	// Create a buffer to write CSV data to
@@ -53,7 +63,7 @@ func (cm *CSVMetrics) GetCSVMetrics() (string, error) {
 	// Write header
 	header := []string{"timestamp", "switch_id", "bandwidth_mbps", "latency_ms", "packet_errors"}
 	if err := writer.Write(header); err != nil {
-		return "", fmt.Errorf("error writing header: %w", err)
+		return nil, fmt.Errorf("error writing header: %w", err)
 	}
 
 	// Get current timestamp
@@ -79,19 +89,22 @@ func (cm *CSVMetrics) GetCSVMetrics() (string, error) {
 		}
 
 		if err := writer.Write(row); err != nil {
-			return "", fmt.Errorf("error writing row: %w", err)
+			return nil, fmt.Errorf("error writing row: %w", err)
 		}
 	}
 
 	// Flush the writer to ensure all data is written to the buffer
 	writer.Flush()
 	if err := writer.Error(); err != nil {
-		return "", fmt.Errorf("error flushing writer: %w", err)
+		return nil, fmt.Errorf("error flushing writer: %w", err)
 	}
 
 	// Save to snapshot
-	cm.snapshot = buf.String()
+	snapshot := buf.String()
 	cm.snapshotLastTimeUpdated = time.Now()
 
-	return cm.snapshot, nil
+	return &CSVMetricsResponse{
+		CSVData:          snapshot,
+		HTTPResponseCode: http.StatusOK,
+	}, nil
 }
