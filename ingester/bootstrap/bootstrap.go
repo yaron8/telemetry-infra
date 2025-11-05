@@ -81,6 +81,7 @@ func (b *Bootstrap) Start() error {
 }
 
 func (b *Bootstrap) ListMetricsHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
 	// Try to update metrics before serving
 	if err := b.updateMetrics(); err != nil {
 		http.Error(w, fmt.Sprintf("Error updating metrics: %v", err),
@@ -88,7 +89,7 @@ func (b *Bootstrap) ListMetricsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allKeysAndMetrics, err := b.dao.GetAll(context.Background())
+	allKeysAndMetrics, err := b.dao.GetAll(ctx)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error retrieving metrics: %v", err),
 			http.StatusInternalServerError)
@@ -111,6 +112,8 @@ func (b *Bootstrap) ListMetricsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (b *Bootstrap) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+
 	// Try to update metrics before serving
 	if err := b.updateMetrics(); err != nil {
 		http.Error(w, fmt.Sprintf("Error updating metrics: %v", err),
@@ -124,16 +127,32 @@ func (b *Bootstrap) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metric := r.URL.Query().Get("metric")
-	if metric == "" {
+	metricName := r.URL.Query().Get("metric")
+	if metricName == "" {
 		http.Error(w, "Missing metric parameter", http.StatusBadRequest)
 		return
 	}
 
-	response := fmt.Sprintf("switch_id: %s, metric: %s", switchID, metric)
+	val, err := b.dao.GetMetric(ctx, switchID, metricName)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error retrieving metric: %v", err),
+			http.StatusBadRequest)
+		return
+	}
+
+	// Set content type to JSON
+	w.Header().Set("Content-Type", "application/json")
+
+	// Marshal the value to JSON (handles string, float, int, bool, etc.)
+	jsonData, err := json.Marshal(val)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error encoding value to JSON: %v", err),
+			http.StatusInternalServerError)
+		return
+	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(response))
+	w.Write(jsonData)
 }
 
 func (b *Bootstrap) updateMetrics() error {

@@ -69,3 +69,27 @@ func (dao *DAOMetrics) GetAll(ctx context.Context) ([]map[string]telemetrics.Met
 
 	return result, nil
 }
+
+// GetMetric retrieves a specific metric value for a given key from Redis
+// Returns the metric value as interface{}, or an error if key or metric doesn't exist
+func (dao *DAOMetrics) GetMetric(ctx context.Context, key string, metric string) (interface{}, error) {
+	// Get the value for this key
+	data, err := dao.redisClient.Get(ctx, key).Result()
+	if err != nil {
+		return nil, fmt.Errorf("key does not exist: %s", key)
+	}
+
+	// Unmarshal into a map to access individual fields
+	var metricMap map[string]interface{}
+	if err := json.Unmarshal([]byte(data), &metricMap); err != nil {
+		return nil, fmt.Errorf("error parsing data for key %s: %w", key, err)
+	}
+
+	// Check if the metric exists in the map
+	value, exists := metricMap[metric]
+	if !exists {
+		return nil, fmt.Errorf("metric '%s' does not exist in key '%s'", metric, key)
+	}
+
+	return value, nil
+}
