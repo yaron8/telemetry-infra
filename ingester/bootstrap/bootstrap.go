@@ -33,8 +33,8 @@ func (b *Bootstrap) Start() error {
 	})
 
 	// Telemetry endpoints
-	mux.HandleFunc("/telemetry/ListMetrics", ListMetricsHandler)
-	mux.HandleFunc("/telemetry/GetMetric", GetMetricHandler)
+	mux.HandleFunc("/telemetry/ListMetrics", b.ListMetricsHandler)
+	mux.HandleFunc("/telemetry/GetMetric", b.GetMetricHandler)
 
 	b.server = &http.Server{
 		Addr:         fmt.Sprintf(":%d", b.config.Port),
@@ -52,16 +52,50 @@ func (b *Bootstrap) Start() error {
 	return nil
 }
 
-func ListMetricsHandler(w http.ResponseWriter, r *http.Request) {
+func (b *Bootstrap) ListMetricsHandler(w http.ResponseWriter, r *http.Request) {
+	// Try to update metrics before serving
+	if err := b.updateMetrics(); err != nil {
+		http.Error(w, fmt.Sprintf("Error updating metrics: %v", err),
+			http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("hello ListMetrics"))
 }
 
-func GetMetricHandler(w http.ResponseWriter, r *http.Request) {
+func (b *Bootstrap) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
+	// Try to update metrics before serving
+	if err := b.updateMetrics(); err != nil {
+		http.Error(w, fmt.Sprintf("Error updating metrics: %v", err),
+			http.StatusInternalServerError)
+		return
+	}
+
 	switchID := r.URL.Query().Get("switch_id")
 	metric := r.URL.Query().Get("metric")
 
 	response := fmt.Sprintf("switch_id: %s, metric: %s", switchID, metric)
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(response))
+}
+
+func (b *Bootstrap) updateMetrics() error {
+	resp, err := http.Get("http://localhost:9001/counters")
+	if err != nil {
+		fmt.Println("error")
+		return fmt.Errorf("failed to fetch metrics: %w", err)
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusNotModified:
+		fmt.Println("304 - skip")
+	case http.StatusOK:
+		fmt.Println("200 - ok")
+	default:
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	return nil
 }
