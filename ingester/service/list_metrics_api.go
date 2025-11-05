@@ -1,14 +1,13 @@
 package service
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 )
 
 func (api *APIServer) ListMetricsHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 
 	allKeysAndMetrics, err := api.dao.GetAll(ctx)
 	if err != nil {
@@ -17,17 +16,15 @@ func (api *APIServer) ListMetricsHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Set content type to JSON
+	// Set content type and status code before encoding
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 
-	// Marshal the metrics to JSON
-	jsonData, err := json.Marshal(allKeysAndMetrics)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Error encoding metrics to JSON: %v", err),
-			http.StatusInternalServerError)
+	// Use encoder to stream JSON directly to response writer
+	// This avoids allocating the entire JSON in memory
+	if err := json.NewEncoder(w).Encode(allKeysAndMetrics); err != nil {
+		// Can't send error response after WriteHeader, just log it
+		fmt.Printf("Error encoding metrics to JSON: %v\n", err)
 		return
 	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Write(jsonData)
 }

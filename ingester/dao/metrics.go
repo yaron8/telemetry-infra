@@ -38,32 +38,58 @@ func (dao *DAOMetrics) AddKey(ctx context.Context, key string, record telemetric
 // Each map contains a single key-value pair where the key is the Redis key
 // and the value is the MetricRecord
 func (dao *DAOMetrics) GetAll(ctx context.Context) ([]map[string]telemetrics.MetricRecord, error) {
-	// Get all keys matching the metric pattern
-	keys, err := dao.redisClient.Keys(ctx, "*").Result()
-	if err != nil {
-		return nil, err
+	// Use SCAN instead of KEYS to avoid blocking Redis
+	var keys []string
+	var cursor uint64
+	for {
+		var scanKeys []string
+		var err error
+		scanKeys, cursor, err = dao.redisClient.Scan(ctx, cursor, "*", 100).Result()
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, scanKeys...)
+		if cursor == 0 {
+			break
+		}
 	}
 
+	if len(keys) == 0 {
+		return []map[string]telemetrics.MetricRecord{}, nil
+	}
+
+	// Use pipeline to fetch all values in batch
+	pipe := dao.redisClient.Pipeline()
+	cmds := make([]*redis.StringCmd, len(keys))
+	for i, key := range keys {
+		cmds[i] = pipe.Get(ctx, key)
+	}
+
+	_, err := pipe.Exec(ctx)
+	if err != nil && err != redis.Nil {
+		// Continue even if some keys fail
+	}
+
+	// Pre-allocate result slice
 	result := make([]map[string]telemetrics.MetricRecord, 0, len(keys))
 
-	for _, key := range keys {
-		// Get the value for this key
-		data, err := dao.redisClient.Get(ctx, key).Result()
+	for i, cmd := range cmds {
+		data, err := cmd.Result()
 		if err != nil {
-			fmt.Printf("Error fetching key %s: %v\n", key, err)
+			// Skip keys that don't exist or have errors
 			continue
 		}
 
 		// Parse the JSON data into MetricRecord
 		var record telemetrics.MetricRecord
 		if err := json.Unmarshal([]byte(data), &record); err != nil {
-			fmt.Printf("Error parsing MetricRecord for key %s: %v\n", key, err)
+			fmt.Printf("Error parsing MetricRecord for key %s: %v\n", keys[i], err)
 			continue
 		}
 
 		// Add to result as a map with single key-value pair
 		result = append(result, map[string]telemetrics.MetricRecord{
-			key: record,
+			keys[i]: record,
 		})
 	}
 
