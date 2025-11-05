@@ -9,12 +9,6 @@ import (
 
 func (api *APIServer) ListMetricsHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
-	// Try to update metrics before serving
-	if err := api.updateMetrics(); err != nil {
-		http.Error(w, fmt.Sprintf("Error updating metrics: %v", err),
-			http.StatusInternalServerError)
-		return
-	}
 
 	allKeysAndMetrics, err := api.dao.GetAll(ctx)
 	if err != nil {
