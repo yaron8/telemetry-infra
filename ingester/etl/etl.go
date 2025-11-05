@@ -15,14 +15,16 @@ import (
 )
 
 type ETL struct {
-	dao      *dao.DAOMetrics
-	interval time.Duration
+	dao          *dao.DAOMetrics
+	interval     time.Duration
+	generatorURL string
 }
 
-func NewETL(dao *dao.DAOMetrics, interval time.Duration) *ETL {
+func NewETL(dao *dao.DAOMetrics, interval time.Duration, generatorURL string) *ETL {
 	return &ETL{
-		dao:      dao,
-		interval: interval,
+		dao:          dao,
+		interval:     interval,
+		generatorURL: generatorURL,
 	}
 }
 
@@ -38,7 +40,7 @@ func (etl *ETL) Run() {
 }
 
 func (etl *ETL) updateMetrics() error {
-	resp, err := http.Get("http://localhost:9001/counters")
+	resp, err := http.Get(etl.generatorURL + "/counters")
 	if err != nil {
 		fmt.Println("error")
 		return fmt.Errorf("failed to fetch metrics: %w", err)

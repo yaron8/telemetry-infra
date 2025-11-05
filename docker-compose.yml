@@ -15,6 +15,53 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
+    networks:
+      - telemetry-network
+
+  generator:
+    build:
+      context: .
+      dockerfile: generator/Dockerfile
+    container_name: telemetry-generator
+    ports:
+      - "9001:9001"
+    restart: unless-stopped
+    networks:
+      - telemetry-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9001/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  ingester:
+    build:
+      context: .
+      dockerfile: ingester/Dockerfile
+    container_name: telemetry-ingester
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - GENERATOR_URL=http://generator:9001
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      generator:
+        condition: service_healthy
+    networks:
+      - telemetry-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+networks:
+  telemetry-network:
+    driver: bridge
 
 volumes:
   redis-data:

@@ -53,6 +53,7 @@ func (b *Bootstrap) Start() error {
 	etl := etl.NewETL(
 		b.daoMetrics,
 		b.config.ETL.Interval,
+		b.config.ETL.GeneratorURL,
 	)
 
 	go func() {
