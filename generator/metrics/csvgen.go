@@ -14,36 +14,36 @@ import (
 const numOfDataLines = 100
 
 type CSVMetrics struct {
-	mu         sync.RWMutex
-	cachedData string
-	cacheTime  time.Time
-	cacheTTL   time.Duration
+	mu                      sync.RWMutex
+	snapshot                string
+	snapshotLastTimeUpdated time.Time
+	snapshotTTL             time.Duration
 }
 
-func NewCSVMetrics(cacheTTL time.Duration) *CSVMetrics {
+func NewCSVMetrics(snapshotTTL time.Duration) *CSVMetrics {
 	return &CSVMetrics{
-		cacheTTL: cacheTTL,
+		snapshotTTL: snapshotTTL,
 	}
 }
 
 // GetCSVMetrics generates CSV formatted metrics data with caching
 func (cm *CSVMetrics) GetCSVMetrics() (string, error) {
-	// Check if cache is valid
+	// Check if snapshot is valid
 	cm.mu.RLock()
-	if time.Since(cm.cacheTime) < cm.cacheTTL && cm.cachedData != "" {
-		cachedData := cm.cachedData
+	if time.Since(cm.snapshotLastTimeUpdated) < cm.snapshotTTL && cm.snapshot != "" {
+		snapshot := cm.snapshot
 		cm.mu.RUnlock()
-		return cachedData, nil
+		return snapshot, nil
 	}
 	cm.mu.RUnlock()
 
-	// Cache is expired or empty, generate new data
+	// Snapshot is expired or empty, generate new data
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
 	// Double-check after acquiring write lock (another goroutine might have updated it)
-	if time.Since(cm.cacheTime) < cm.cacheTTL && cm.cachedData != "" {
-		return cm.cachedData, nil
+	if time.Since(cm.snapshotLastTimeUpdated) < cm.snapshotTTL && cm.snapshot != "" {
+		return cm.snapshot, nil
 	}
 
 	// Create a buffer to write CSV data to
@@ -89,9 +89,9 @@ func (cm *CSVMetrics) GetCSVMetrics() (string, error) {
 		return "", fmt.Errorf("error flushing writer: %w", err)
 	}
 
-	// Save to cache
-	cm.cachedData = buf.String()
-	cm.cacheTime = time.Now()
+	// Save to snapshot
+	cm.snapshot = buf.String()
+	cm.snapshotLastTimeUpdated = time.Now()
 
-	return cm.cachedData, nil
+	return cm.snapshot, nil
 }

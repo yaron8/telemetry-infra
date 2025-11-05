@@ -257,18 +257,18 @@ func TestNewCSVMetrics(t *testing.T) {
 	}
 
 	// Verify initial cache is empty
-	if cm.cachedData != "" {
+	if cm.snapshot != "" {
 		t.Error("New CSVMetrics should have empty cachedData")
 	}
 
 	// Verify cacheTime is zero value
-	if !cm.cacheTime.IsZero() {
+	if !cm.snapshotLastTimeUpdated.IsZero() {
 		t.Error("New CSVMetrics should have zero cacheTime")
 	}
 
 	// Verify cacheDuration is set correctly
-	if cm.cacheTTL != testCacheDuration {
-		t.Errorf("cacheDuration = %v, want %v", cm.cacheTTL, testCacheDuration)
+	if cm.snapshotTTL != testCacheDuration {
+		t.Errorf("cacheDuration = %v, want %v", cm.snapshotTTL, testCacheDuration)
 	}
 }
 
