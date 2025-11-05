@@ -35,9 +35,12 @@ func (api *APIServer) Start() error {
 	// Set up HTTP handlers
 	mux.HandleFunc("/counters", api.countersHandler)
 
+	// Wrap the mux with logging middleware
+	handler := api.middleware(mux)
+
 	api.server = &http.Server{
 		Addr:         fmt.Sprintf(":%d", api.config.Port),
-		Handler:      mux,
+		Handler:      handler,
 		ReadTimeout:  60 * time.Second,
 		WriteTimeout: 60 * time.Second,
 		IdleTimeout:  60 * time.Second,
