@@ -19,7 +19,7 @@ func NewBootstrap() (*Bootstrap, error) {
 	cfg := config.NewConfig()
 
 	return &Bootstrap{
-		csvMetrics: metrics.NewCSVMetrics(cfg.CacheTTL),
+		csvMetrics: metrics.NewCSVMetrics(cfg.SnapshotTTL),
 		config:     cfg,
 	}, nil
 }

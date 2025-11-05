@@ -8,11 +8,11 @@ import (
 	"time"
 )
 
-const testCacheDuration = 5 * time.Second
+const testSnapshotTTL = 5 * time.Second
 
 // tests that GetCSVMetrics returns valid CSV data
 func TestGetCSVMetrics_BasicFunctionality(t *testing.T) {
-	cm := NewCSVMetrics(testCacheDuration)
+	cm := NewCSVMetrics(testSnapshotTTL)
 
 	csvData, err := cm.GetCSVMetrics()
 	if err != nil {
@@ -37,7 +37,7 @@ func TestGetCSVMetrics_BasicFunctionality(t *testing.T) {
 
 // tests the CSV format and structure
 func TestGetCSVMetrics_CSVFormat(t *testing.T) {
-	cm := NewCSVMetrics(testCacheDuration)
+	cm := NewCSVMetrics(testSnapshotTTL)
 
 	csvData, err := cm.GetCSVMetrics()
 	if err != nil {
@@ -88,9 +88,9 @@ func TestGetCSVMetrics_CSVFormat(t *testing.T) {
 	}
 }
 
-// tests that cache returns the same data
-func TestGetCSVMetrics_CacheReturnsIdenticalData(t *testing.T) {
-	cm := NewCSVMetrics(testCacheDuration)
+// tests that snapshot returns the same data
+func TestGetCSVMetrics_SnapshotReturnsIdenticalData(t *testing.T) {
+	cm := NewCSVMetrics(testSnapshotTTL)
 
 	// First call - should generate new data
 	firstCall, err := cm.GetCSVMetrics()
@@ -98,14 +98,14 @@ func TestGetCSVMetrics_CacheReturnsIdenticalData(t *testing.T) {
 		t.Fatalf("First call returned error: %v", err)
 	}
 
-	// Second call immediately after - should return cached data
+	// Second call immediately after - should return the snapshot
 	secondCall, err := cm.GetCSVMetrics()
 	if err != nil {
 		t.Fatalf("Second call returned error: %v", err)
 	}
 
 	if firstCall != secondCall {
-		t.Error("Second call within cache duration returned different data (should be cached)")
+		t.Error("Second call within snapshot duration returned different data (should be cached)")
 	}
 
 	// Third call after short delay - should still be cached
@@ -116,17 +116,17 @@ func TestGetCSVMetrics_CacheReturnsIdenticalData(t *testing.T) {
 	}
 
 	if firstCall != thirdCall {
-		t.Error("Third call within cache duration returned different data (should be cached)")
+		t.Error("Third call within snapshot duration returned different data (should be cached)")
 	}
 }
 
-// tests that cache expires after 10 seconds
-func TestGetCSVMetrics_CacheExpires(t *testing.T) {
+// tests that snapshot expires after 10 seconds
+func TestGetCSVMetrics_SnapshotExpires(t *testing.T) {
 	if testing.Short() {
-		t.Skip("Skipping cache expiration test in short mode")
+		t.Skip("Skipping snapshot expiration test in short mode")
 	}
 
-	cm := NewCSVMetrics(testCacheDuration)
+	cm := NewCSVMetrics(testSnapshotTTL)
 
 	// First call - should generate new data
 	firstCall, err := cm.GetCSVMetrics()
@@ -134,29 +134,29 @@ func TestGetCSVMetrics_CacheExpires(t *testing.T) {
 		t.Fatalf("First call returned error: %v", err)
 	}
 
-	sleepFor := testCacheDuration + 2*time.Second
-	// Wait for cache to expire
+	sleepFor := testSnapshotTTL + 2*time.Second
+	// Wait for snapshot to expire
 
-	t.Log("Waiting for cache to expire")
+	t.Log("Waiting for snapshot to expire")
 	time.Sleep(sleepFor)
 
-	// Call after cache expiration - should generate new data
+	// Call after snapshot expiration - should generate new data
 	secondCall, err := cm.GetCSVMetrics()
 	if err != nil {
-		t.Fatalf("Second call after cache expiry returned error: %v", err)
+		t.Fatalf("Second call after snapshot expiry returned error: %v", err)
 	}
 
 	// The data should be different because:
 	// 1. Random values will be different
 	// 2. Timestamp will be different
 	if firstCall == secondCall {
-		t.Error("Call after cache expiry returned identical data (should be regenerated)")
+		t.Error("Call after snapshot expiry returned identical data (should be regenerated)")
 	}
 }
 
 // tests thread safety with concurrent calls
 func TestGetCSVMetrics_ConcurrentAccess(t *testing.T) {
-	cm := NewCSVMetrics(testCacheDuration)
+	cm := NewCSVMetrics(testSnapshotTTL)
 	numGoroutines := 50
 	var wg sync.WaitGroup
 
@@ -197,18 +197,18 @@ func TestGetCSVMetrics_ConcurrentAccess(t *testing.T) {
 		t.Fatalf("Expected %d results, got %d", numGoroutines, len(allResults))
 	}
 
-	// All concurrent calls should return the same cached data
+	// All concurrent calls should return the same snapshot
 	firstResult := allResults[0]
 	for i, result := range allResults {
 		if result != firstResult {
-			t.Errorf("Result %d differs from first result (cache should be consistent)", i)
+			t.Errorf("Result %d differs from first result (snapshot should be consistent)", i)
 		}
 	}
 }
 
 // tests that generated data has valid format
 func TestGetCSVMetrics_DataFormat(t *testing.T) {
-	cm := NewCSVMetrics(testCacheDuration)
+	cm := NewCSVMetrics(testSnapshotTTL)
 
 	csvData, err := cm.GetCSVMetrics()
 	if err != nil {
@@ -250,32 +250,32 @@ func TestGetCSVMetrics_DataFormat(t *testing.T) {
 
 // tests the constructor
 func TestNewCSVMetrics(t *testing.T) {
-	cm := NewCSVMetrics(testCacheDuration)
+	cm := NewCSVMetrics(testSnapshotTTL)
 
 	if cm == nil {
 		t.Fatal("NewCSVMetrics() returned nil")
 	}
 
-	// Verify initial cache is empty
+	// Verify initial snapshot is empty
 	if cm.snapshot != "" {
-		t.Error("New CSVMetrics should have empty cachedData")
+		t.Error("New CSVMetrics should have empty snapshot")
 	}
 
-	// Verify cacheTime is zero value
+	// Verify snapshotLastTimeUpdated is zero value
 	if !cm.snapshotLastTimeUpdated.IsZero() {
-		t.Error("New CSVMetrics should have zero cacheTime")
+		t.Error("New CSVMetrics should have zero snapshotLastTimeUpdated")
 	}
 
-	// Verify cacheDuration is set correctly
-	if cm.snapshotTTL != testCacheDuration {
-		t.Errorf("cacheDuration = %v, want %v", cm.snapshotTTL, testCacheDuration)
+	// Verify snapshotTTL is set correctly
+	if cm.snapshotTTL != testSnapshotTTL {
+		t.Errorf("snapshotTTL = %v, want %v", cm.snapshotTTL, testSnapshotTTL)
 	}
 }
 
-// tests that different instances have separate caches
+// tests that different instances have separate snapshots
 func TestGetCSVMetrics_MultipleInstances(t *testing.T) {
-	cm1 := NewCSVMetrics(testCacheDuration)
-	cm2 := NewCSVMetrics(testCacheDuration)
+	cm1 := NewCSVMetrics(testSnapshotTTL)
+	cm2 := NewCSVMetrics(testSnapshotTTL)
 
 	data1, err := cm1.GetCSVMetrics()
 	if err != nil {

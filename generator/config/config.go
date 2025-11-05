@@ -5,13 +5,13 @@ import (
 )
 
 type Config struct {
-	Port     int           `yaml:"port"`     // Default port
-	CacheTTL time.Duration `yaml:"cacheTTL"` // Default cache TTL
+	Port        int           // Port
+	SnapshotTTL time.Duration // Snapshot TTL
 }
 
 func NewConfig() *Config {
 	return &Config{
-		Port:     9001,
-		CacheTTL: 10 * time.Second,
+		Port:        9001,
+		SnapshotTTL: 10 * time.Second,
 	}
 }
