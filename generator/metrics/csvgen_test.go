@@ -266,8 +266,8 @@ func TestNewCSVMetrics(t *testing.T) {
 	}
 
 	// Verify cacheDuration is set correctly
-	if cm.cacheDuration != testCacheDuration {
-		t.Errorf("cacheDuration = %v, want %v", cm.cacheDuration, testCacheDuration)
+	if cm.cacheTTL != testCacheDuration {
+		t.Errorf("cacheDuration = %v, want %v", cm.cacheTTL, testCacheDuration)
 	}
 }
 
