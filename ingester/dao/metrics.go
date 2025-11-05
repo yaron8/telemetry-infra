@@ -19,6 +19,7 @@ type DAOMetrics struct {
 func NewDAOMetrics(redisClient *redis.Client, ttl time.Duration) *DAOMetrics {
 	return &DAOMetrics{
 		redisClient: redisClient,
+		ttl:         ttl,
 	}
 }
 

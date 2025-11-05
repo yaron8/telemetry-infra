@@ -1,14 +1,19 @@
 package bootstrap
 
 import (
+	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/yaron8/telemetry-infra/ingester/config"
 	"github.com/yaron8/telemetry-infra/ingester/dao"
+	"github.com/yaron8/telemetry-infra/telemetrics"
 )
 
 type Bootstrap struct {
@@ -32,6 +37,7 @@ func (b *Bootstrap) Start() error {
 		Addr:     fmt.Sprintf("%s:%d", b.config.Redis.Host, b.config.Redis.Port),
 		Password: "", // no password set
 		DB:       0,  // use default DB
+		Protocol: 2,
 	})
 
 	b.dao = *dao.NewDAOMetrics(redisClient, b.config.Redis.TTL)
@@ -114,5 +120,84 @@ func (b *Bootstrap) updateMetrics() error {
 
 func (b *Bootstrap) WriteMetricsLineByLine(respBody io.ReadCloser) error {
 	fmt.Println("Writing metrics..")
+
+	scanner := bufio.NewScanner(respBody)
+	ctx := context.Background()
+
+	// Skip the header line
+	if scanner.Scan() {
+		// header line is skipped
+	}
+
+	lineNumber := 1
+	for scanner.Scan() {
+		lineNumber++
+		line := strings.TrimSpace(scanner.Text())
+
+		// Ignore empty lines (including lines with only whitespace)
+		if line == "" {
+			continue
+		}
+
+		// Parse the CSV line into a MetricRecord
+		record, err := parseCSVLine(line)
+		if err != nil {
+			fmt.Printf("Error parsing line %d: %v\n", lineNumber, err)
+			continue
+		}
+
+		// Store the metric using the DAO
+		if err := b.dao.Store(ctx, record.SwitchID, record); err != nil {
+			fmt.Printf("Error storing metric at line %d: %v\n", lineNumber, err)
+			continue
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("error reading response body: %w", err)
+	}
+
 	return nil
+}
+
+// parseCSVLine parses a CSV line into a MetricRecord
+// Expected format: timestamp,switch_id,bandwidth_mbps,latency_ms,packet_errors
+func parseCSVLine(line string) (telemetrics.MetricRecord, error) {
+	fields := strings.Split(line, ",")
+
+	if len(fields) != 5 {
+		return telemetrics.MetricRecord{}, fmt.Errorf("expected 5 fields, got %d", len(fields))
+	}
+
+	// Parse timestamp
+	timestamp, err := strconv.ParseInt(strings.TrimSpace(fields[0]), 10, 64)
+	if err != nil {
+		return telemetrics.MetricRecord{}, fmt.Errorf("invalid timestamp: %w", err)
+	}
+
+	// Parse bandwidth_mbps
+	bandwidthMbps, err := strconv.ParseFloat(strings.TrimSpace(fields[2]), 64)
+	if err != nil {
+		return telemetrics.MetricRecord{}, fmt.Errorf("invalid bandwidth_mbps: %w", err)
+	}
+
+	// Parse latency_ms
+	latencyMs, err := strconv.ParseFloat(strings.TrimSpace(fields[3]), 64)
+	if err != nil {
+		return telemetrics.MetricRecord{}, fmt.Errorf("invalid latency_ms: %w", err)
+	}
+
+	// Parse packet_errors
+	packetErrors, err := strconv.Atoi(strings.TrimSpace(fields[4]))
+	if err != nil {
+		return telemetrics.MetricRecord{}, fmt.Errorf("invalid packet_errors: %w", err)
+	}
+
+	return telemetrics.MetricRecord{
+		Timestamp:     timestamp,
+		SwitchID:      strings.TrimSpace(fields[1]),
+		BandwidthMbps: bandwidthMbps,
+		LatencyMs:     latencyMs,
+		PacketErrors:  packetErrors,
+	}, nil
 }
