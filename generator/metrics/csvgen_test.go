@@ -8,9 +8,9 @@ import (
 	"time"
 )
 
-const testCacheDuration = 10 * time.Second
+const testCacheDuration = 5 * time.Second
 
-// TestGetCSVMetrics_BasicFunctionality tests that GetCSVMetrics returns valid CSV data
+// tests that GetCSVMetrics returns valid CSV data
 func TestGetCSVMetrics_BasicFunctionality(t *testing.T) {
 	cm := NewCSVMetrics(testCacheDuration)
 
@@ -35,7 +35,7 @@ func TestGetCSVMetrics_BasicFunctionality(t *testing.T) {
 	}
 }
 
-// TestGetCSVMetrics_CSVFormat tests the CSV format and structure
+// tests the CSV format and structure
 func TestGetCSVMetrics_CSVFormat(t *testing.T) {
 	cm := NewCSVMetrics(testCacheDuration)
 
@@ -88,7 +88,7 @@ func TestGetCSVMetrics_CSVFormat(t *testing.T) {
 	}
 }
 
-// TestGetCSVMetrics_CacheReturnsIdenticalData tests that cache returns the same data
+// tests that cache returns the same data
 func TestGetCSVMetrics_CacheReturnsIdenticalData(t *testing.T) {
 	cm := NewCSVMetrics(testCacheDuration)
 
@@ -120,9 +120,8 @@ func TestGetCSVMetrics_CacheReturnsIdenticalData(t *testing.T) {
 	}
 }
 
-// TestGetCSVMetrics_CacheExpires tests that cache expires after 10 seconds
+// tests that cache expires after 10 seconds
 func TestGetCSVMetrics_CacheExpires(t *testing.T) {
-	// This test takes ~11 seconds to run
 	if testing.Short() {
 		t.Skip("Skipping cache expiration test in short mode")
 	}
@@ -135,9 +134,11 @@ func TestGetCSVMetrics_CacheExpires(t *testing.T) {
 		t.Fatalf("First call returned error: %v", err)
 	}
 
-	// Wait for cache to expire (10 seconds + buffer)
-	t.Log("Waiting for cache to expire (11 seconds)...")
-	time.Sleep(11 * time.Second)
+	sleepFor := testCacheDuration + 2*time.Second
+	// Wait for cache to expire
+
+	t.Log("Waiting for cache to expire")
+	time.Sleep(sleepFor)
 
 	// Call after cache expiration - should generate new data
 	secondCall, err := cm.GetCSVMetrics()
@@ -153,7 +154,7 @@ func TestGetCSVMetrics_CacheExpires(t *testing.T) {
 	}
 }
 
-// TestGetCSVMetrics_ConcurrentAccess tests thread safety with concurrent calls
+// tests thread safety with concurrent calls
 func TestGetCSVMetrics_ConcurrentAccess(t *testing.T) {
 	cm := NewCSVMetrics(testCacheDuration)
 	numGoroutines := 50
@@ -205,7 +206,7 @@ func TestGetCSVMetrics_ConcurrentAccess(t *testing.T) {
 	}
 }
 
-// TestGetCSVMetrics_DataFormat tests that generated data has valid format
+// tests that generated data has valid format
 func TestGetCSVMetrics_DataFormat(t *testing.T) {
 	cm := NewCSVMetrics(testCacheDuration)
 
@@ -247,7 +248,7 @@ func TestGetCSVMetrics_DataFormat(t *testing.T) {
 	}
 }
 
-// TestNewCSVMetrics tests the constructor
+// tests the constructor
 func TestNewCSVMetrics(t *testing.T) {
 	cm := NewCSVMetrics(testCacheDuration)
 
@@ -271,7 +272,7 @@ func TestNewCSVMetrics(t *testing.T) {
 	}
 }
 
-// TestGetCSVMetrics_MultipleInstances tests that different instances have separate caches
+// tests that different instances have separate caches
 func TestGetCSVMetrics_MultipleInstances(t *testing.T) {
 	cm1 := NewCSVMetrics(testCacheDuration)
 	cm2 := NewCSVMetrics(testCacheDuration)
