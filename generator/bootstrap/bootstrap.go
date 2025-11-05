@@ -4,25 +4,30 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/yaron8/telemetry-infra/generator/metrics"
 )
 
+const serverPort = ":9001"
+
 type Bootstrap struct {
+	csvMetrics *metrics.CSVMetrics
 }
 
 func NewBootstrap() *Bootstrap {
-	return &Bootstrap{}
+	return &Bootstrap{
+		csvMetrics: metrics.NewCSVMetrics(),
+	}
 }
 
 // StartServer initializes and starts the HTTP server on port 9001
 func (b *Bootstrap) StartServer() error {
 	// Set up HTTP handlers
 	http.HandleFunc("/counters", b.countersHandler)
-	http.HandleFunc("/data", b.dataHandler)
 
 	// Start the server
-	port := ":9001"
-	fmt.Printf("Starting HTTP server on port %s\n", port)
-	if err := http.ListenAndServe(port, nil); err != nil {
+	fmt.Printf("Starting HTTP server on port %s\n", serverPort)
+	if err := http.ListenAndServe(serverPort, nil); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 		return err
 	}
@@ -32,15 +37,12 @@ func (b *Bootstrap) StartServer() error {
 
 // countersHandler handles the /counters endpoint
 func (b *Bootstrap) countersHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "this is counters EP")
-}
+	csvData, err := b.csvMetrics.GetCSVMetrics()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error generating CSV metrics: %v", err), http.StatusInternalServerError)
+		return
+	}
 
-// dataHandler handles the /data endpoint with query parameters
-func (b *Bootstrap) dataHandler(w http.ResponseWriter, r *http.Request) {
-	// Get query parameters
-	paramA := r.URL.Query().Get("param_a")
-	paramB := r.URL.Query().Get("param_b")
-
-	// Print the parameters
-	fmt.Fprintf(w, "param_a: %s\nparam_b: %s", paramA, paramB)
+	w.Header().Set("Content-Type", "text/csv")
+	fmt.Fprint(w, csvData)
 }

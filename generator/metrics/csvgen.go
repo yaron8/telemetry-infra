@@ -5,22 +5,45 @@ import (
 	"encoding/csv"
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/yaron8/telemetry-infra/metrics"
 )
 
 const numOfDataLines = 100
+const cacheDuration = 10 * time.Second
 
 type CSVMetrics struct {
+	mu            sync.RWMutex
+	cachedData    string
+	cacheTime     time.Time
 }
 
 func NewCSVMetrics() *CSVMetrics {
 	return &CSVMetrics{}
 }
 
-// GetCSVMetrics generates CSV formatted metrics data
+// GetCSVMetrics generates CSV formatted metrics data with 10-second caching
 func (cm *CSVMetrics) GetCSVMetrics() (string, error) {
+	// Check if cache is valid (less than 10 seconds old)
+	cm.mu.RLock()
+	if time.Since(cm.cacheTime) < cacheDuration && cm.cachedData != "" {
+		cachedData := cm.cachedData
+		cm.mu.RUnlock()
+		return cachedData, nil
+	}
+	cm.mu.RUnlock()
+
+	// Cache is expired or empty, generate new data
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	// Double-check after acquiring write lock (another goroutine might have updated it)
+	if time.Since(cm.cacheTime) < cacheDuration && cm.cachedData != "" {
+		return cm.cachedData, nil
+	}
+
 	// Create a buffer to write CSV data to
 	var buf bytes.Buffer
 	writer := csv.NewWriter(&buf)
@@ -64,5 +87,9 @@ func (cm *CSVMetrics) GetCSVMetrics() (string, error) {
 		return "", fmt.Errorf("error flushing writer: %w", err)
 	}
 
-	return buf.String(), nil
+	// Save to cache
+	cm.cachedData = buf.String()
+	cm.cacheTime = time.Now()
+
+	return cm.cachedData, nil
 }
