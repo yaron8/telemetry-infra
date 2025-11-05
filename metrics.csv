@@ -1,0 +1,4 @@
+timestamp,switch_name,bandwidth_mbps,latency_ms,packet_errors
+1762335112,sw1,1464.33,23.01,677
+1762335112,sw2,5151.58,46.44,785
+1762335112,sw3,8713.34,17.23,95
