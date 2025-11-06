@@ -49,6 +49,19 @@ All error paths are handled gracefully without panics or undefined behavior.
 ### Deployment & Development
 - **Docker Support**: Complete containerization with Docker Compose orchestration, enabling easy deployment of both services (generator and ingester) along with Redis. Supports development, testing, and production environments with consistent behavior.
 
+## Design and Architecture
+
+### High-Level Design
+
+The system follows a distributed architecture with three main components:
+
+![High-Level Design](images/hld.jpg)
+
+**Architecture Overview:**
+- **Generator Service**: Simulates network switches and generates telemetry data in CSV format. Implements smart caching with HTTP 304 responses to optimize bandwidth.
+- **Ingester Service**: Pulls data from the generator via HTTP, processes it through a background ETL pipeline, and serves query requests through RESTful APIs.
+- **Redis**: Acts as the central data store, providing fast key-value access for metric storage and retrieval.
+
 ## Performance Results
 
 ### Setup
