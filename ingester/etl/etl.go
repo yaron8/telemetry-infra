@@ -105,7 +105,9 @@ func (etl *ETL) writeMetricsLineByLine(respBody io.ReadCloser) error {
 
 	// Update key in Redis for last update time
 	if lastTimeUpdated > 0 {
-		etl.dao.SetLastUpdateTime(ctx, lastTimeUpdated)
+		if err := etl.dao.SetLastUpdateTime(ctx, lastTimeUpdated); err != nil {
+			return fmt.Errorf("failed to set last update time: %w", err)
+		}
 	} else {
 		fmt.Println("Error: No valid timestamp found to update last update time")
 	}
