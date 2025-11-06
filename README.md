@@ -388,21 +388,31 @@ This architecture takes a fundamentally different approach by introducing Apache
 
 **Pros:**
 - **True Microservices Architecture**: Solves the mixed responsibilities problem from Architecture 1 by separating concerns into dedicated services. Each service has a single, well-defined responsibility: Airflow produces to Kafka, Metrics Updater consumes and writes, Metrics Viewer reads and serves.
+
 - **Horizontal Scalability for Both Read and Write Paths**:
   - Multiple Metrics Updater instances can consume from Kafka partitions in parallel, solving the ETL processing bottleneck from Architecture 1
   - Multiple Metrics Viewer instances can handle high volumes of client requests independently
   - Each service scales independently based on its specific load patterns
+
 - **Handles Very High Scale**: Designed for enterprise-scale deployments with massive metric volumes and high request rates. Kafka's distributed architecture and partitioning enable processing millions of metrics per second.
+
 - **Kubernetes Auto-Scaling**: Integrates seamlessly with K8s Horizontal Pod Autoscaler (HPA) using relevant metrics:
   - Scale Metrics Updater based on **Kafka consumer lag** (number of unconsumed messages)
   - Scale Metrics Viewer based on **HTTP request rate** or **response latency**
   - Scale based on **CPU/memory utilization** for both services
+
 - **Decoupled Data Flow**: Kafka acts as a buffer, decoupling producers from consumers. If Metrics Updater instances are down or slow, Kafka retains messages without affecting Airflow or data loss.
+
 - **Replay and Recovery**: Kafka's message retention allows replaying historical metrics for recovery, reprocessing, or debugging scenarios.
+
 - **Independent Deployment**: Each service (Airflow DAG, Metrics Updater, Metrics Viewer) can be deployed, updated, and scaled independently without affecting others.
 
 **Cons:**
-- **Significantly Higher Infrastructure Complexity**: Requires deploying and managing Apache Kafka (including Zookeeper or KRaft), Airflow, two microservices, and Redis. This adds substantial operational overhead.
+- **Significantly Higher Infrastructure Complexity**: Requires deploying and managing Apache Kafka, Airflow, two microservices, and Redis. This adds substantial operational overhead.
+
 - **Increased Operational Costs**: More infrastructure components mean higher cloud costs for compute, storage, and network resources.
+
 - **Over-Engineering for Small Scale**: For low to moderate traffic, this architecture's complexity may not be justified. The current simple architecture or Architecture 1 would suffice.
+
+**Note:** When deploying on AWS, consider using **Amazon ElastiCache for Redis** instead of self-managed Redis. ElastiCache provides 99.999% availability SLA with automatic failover, Multi-AZ replication, and automated backups, guaranteeing data durability and eliminating the risk of data loss. This managed service significantly reduces operational overhead while ensuring enterprise-grade reliability for the metrics storage layer.
 
