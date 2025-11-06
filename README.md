@@ -344,3 +344,29 @@ Details (average, fastest, slowest):
 Status code distribution:
   [200]	5000 responses
 ```
+
+## Alternative Architecture Approaches
+
+### Architecture 1: Airflow-Based ETL Pipeline
+
+In this architecture, we decouple the ETL logic from the Ingester service by moving it to Apache Airflow.
+
+![Airflow-Based ETL Architecture](images/new_architecture_1.jpg)
+
+**Key Changes:**
+- The ETL background thread currently running in the Ingester service is extracted and implemented as an Airflow DAG
+- Airflow pulls CSV data from the Generator service using the same logic currently implemented in the ETL thread
+- The Ingester service becomes a pure API server, handling only HTTP requests for data retrieval
+- Redis continues to serve as the shared state store between Airflow (writer) and Ingester instances (readers)
+
+**Pros:**
+- **True Microservices Architecture with Horizontal Scalability**: With a simple architectural change (moving ETL to Airflow), the Ingester service becomes fully horizontally scalable. Multiple Ingester instances can run independently without coordination, as the single ETL process in Airflow handles all data ingestion. This transforms the system into a true microservices architecture where the API layer scales seamlessly.
+- **Single ETL Process**: Airflow ensures only one ETL job runs at a time (per schedule), eliminating the need for coordination or deduplication logic between multiple service instances.
+- **Separation of Concerns**: Data ingestion (write path) and data serving (read path) are completely decoupled, improving maintainability and fault isolation. Changes to ETL logic don't require redeploying API servers.
+- **Simplified Ingester Design**: The Ingester service becomes stateless and simpler, focusing solely on serving API requests without background thread management.
+- **Independent Resource Management**: ETL and API serving can be scaled independently based on their respective load patterns. For example, scale API servers during peak query times without affecting ETL resources.
+
+**Cons:**
+- **Mixed Responsibilities**: The current Ingester service violates microservices principles by handling two different concerns: (a) consuming metrics from Generator and storing them in Redis, and (b) exposing RESTful APIs for clients to query metrics. This tight coupling makes the service harder to maintain and scale independently.
+- **Doesn't Solve ETL Processing Bottleneck**: While this architecture solves the HTTP request scaling issue (multiple Ingester instances can serve client requests), it doesn't address how to handle huge volumes of metrics arriving in a single ETL pull from the Generator. The ETL process remains a single-threaded bottleneck that cannot be parallelized across multiple workers.
+
