@@ -8,6 +8,7 @@ import (
 	"github.com/yaron8/telemetry-infra/ingester/dao"
 	"github.com/yaron8/telemetry-infra/ingester/etl"
 	"github.com/yaron8/telemetry-infra/ingester/service"
+	"github.com/yaron8/telemetry-infra/logi"
 	"github.com/yaron8/telemetry-infra/telemetrics"
 )
 
@@ -19,6 +20,12 @@ type Bootstrap struct {
 }
 
 func NewBootstrap() (*Bootstrap, error) {
+	// Initialize logger
+	_, err := logi.NewLog(nil)
+	if err != nil {
+		return nil, err
+	}
+
 	// Load configuration
 	cfg := config.NewConfig()
 
@@ -50,6 +57,9 @@ func NewBootstrap() (*Bootstrap, error) {
 }
 
 func (b *Bootstrap) Start() error {
+	logger := logi.GetLogger()
+	logger.Info("Bootstrap is starting")
+
 	etl := etl.NewETL(
 		b.daoMetrics,
 		b.config.ETL.Interval,

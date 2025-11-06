@@ -5,12 +5,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/yaron8/telemetry-infra/ingester/dao"
+	"github.com/yaron8/telemetry-infra/logi"
 	"github.com/yaron8/telemetry-infra/telemetrics"
 )
 
@@ -18,6 +20,7 @@ type ETL struct {
 	dao          *dao.DAOMetrics
 	interval     time.Duration
 	generatorURL string
+	logger       *slog.Logger
 }
 
 func NewETL(dao *dao.DAOMetrics, interval time.Duration, generatorURL string) *ETL {
@@ -25,13 +28,15 @@ func NewETL(dao *dao.DAOMetrics, interval time.Duration, generatorURL string) *E
 		dao:          dao,
 		interval:     interval,
 		generatorURL: generatorURL,
+		logger:       logi.GetLogger(),
 	}
 }
 
 func (etl *ETL) Run() {
+	etl.logger.Info("ETL starting", "interval", etl.interval, "generator_url", etl.generatorURL)
 	for {
 		if err := etl.updateMetrics(); err != nil {
-			fmt.Printf("Error updating metrics: %v\n", err)
+			etl.logger.Error("Error updating metrics", "error", err)
 		}
 
 		// Sleep until the next interval
@@ -42,19 +47,23 @@ func (etl *ETL) Run() {
 func (etl *ETL) updateMetrics() error {
 	resp, err := http.Get(etl.generatorURL + "/counters")
 	if err != nil {
-		fmt.Println("error")
+		etl.logger.Error("Error fetching metrics from generator in EP /counters", "error", err)
 		return fmt.Errorf("failed to fetch metrics: %w", err)
 	}
+
 	defer resp.Body.Close()
 
 	switch resp.StatusCode {
 	case http.StatusNotModified:
-		fmt.Println("304 - skip")
+		// No logging on hot path - cache hit is normal
+		return nil
 	case http.StatusOK:
+		etl.logger.Info("Fetching new metrics from generator")
 		if err := etl.writeMetricsLineByLine(resp.Body); err != nil {
 			return fmt.Errorf("failed to write metrics: %w", err)
 		}
 	default:
+		etl.logger.Error("Unexpected status code from generator", "status_code", resp.StatusCode)
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
@@ -62,8 +71,6 @@ func (etl *ETL) updateMetrics() error {
 }
 
 func (etl *ETL) writeMetricsLineByLine(respBody io.ReadCloser) error {
-	fmt.Println("Pulling metrics from service Generator..")
-
 	scanner := bufio.NewScanner(respBody)
 	ctx := context.Background()
 
@@ -74,8 +81,9 @@ func (etl *ETL) writeMetricsLineByLine(respBody io.ReadCloser) error {
 	}
 
 	lastTimeUpdated := int64(0)
-
 	lineNumber := 1
+	errorCount := 0
+
 	for scanner.Scan() {
 		lineNumber++
 		line := strings.TrimSpace(scanner.Text())
@@ -88,13 +96,15 @@ func (etl *ETL) writeMetricsLineByLine(respBody io.ReadCloser) error {
 		// Parse the CSV line into a MetricRecord
 		switchID, timestamp, record, err := etl.parseCSVLine(line)
 		if err != nil {
-			fmt.Printf("Error parsing line %d: %v\n", lineNumber, err)
+			errorCount++
+			etl.logger.Error("Error parsing line", "line_number", lineNumber, "error", err)
 			continue
 		}
 
 		// Store the metric using the DAO
 		if err := etl.dao.AddMetric(ctx, timestamp, switchID, record); err != nil {
-			fmt.Printf("Error storing metric at line %d: %v\n", lineNumber, err)
+			errorCount++
+			etl.logger.Error("Error storing metric", "line_number", lineNumber, "switch_id", switchID, "error", err)
 			continue
 		}
 
@@ -108,8 +118,12 @@ func (etl *ETL) writeMetricsLineByLine(respBody io.ReadCloser) error {
 		if err := etl.dao.SetLastUpdateTime(ctx, lastTimeUpdated); err != nil {
 			return fmt.Errorf("failed to set last update time: %w", err)
 		}
+		etl.logger.Info("Metrics processed successfully",
+			"total_lines", lineNumber-1,
+			"errors", errorCount,
+			"last_timestamp", lastTimeUpdated)
 	} else {
-		fmt.Println("Error: No valid timestamp found to update last update time")
+		etl.logger.Error("No valid timestamp found to update last update time")
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -125,29 +139,34 @@ func (etl *ETL) parseCSVLine(line string) (string, int64, telemetrics.MetricReco
 	fields := strings.Split(line, ",")
 
 	if len(fields) != 5 {
+		etl.logger.Error("Invalid number of fields in CSV line", "line", line, "field_count", len(fields))
 		return "", 0, telemetrics.MetricRecord{}, fmt.Errorf("expected 5 fields, got %d", len(fields))
 	}
 
 	timestamp, err := strconv.ParseInt(strings.TrimSpace(fields[0]), 10, 64)
 	if err != nil {
+		etl.logger.Error("Error parsing timestamp", "value", fields[0], "error", err)
 		return "", 0, telemetrics.MetricRecord{}, fmt.Errorf("invalid timestamp: %w", err)
 	}
 
 	// Parse bandwidth_mbps
 	bandwidthMbps, err := strconv.ParseFloat(strings.TrimSpace(fields[2]), 64)
 	if err != nil {
+		etl.logger.Error("Error parsing bandwidth_mbps", "value", fields[2], "error", err)
 		return "", 0, telemetrics.MetricRecord{}, fmt.Errorf("invalid bandwidth_mbps: %w", err)
 	}
 
 	// Parse latency_ms
 	latencyMs, err := strconv.ParseFloat(strings.TrimSpace(fields[3]), 64)
 	if err != nil {
+		etl.logger.Error("Error parsing latency_ms", "value", fields[3], "error", err)
 		return "", 0, telemetrics.MetricRecord{}, fmt.Errorf("invalid latency_ms: %w", err)
 	}
 
 	// Parse packet_errors
 	packetErrors, err := strconv.Atoi(strings.TrimSpace(fields[4]))
 	if err != nil {
+		etl.logger.Error("Error parsing packet_errors", "value", fields[4], "error", err)
 		return "", 0, telemetrics.MetricRecord{}, fmt.Errorf("invalid packet_errors: %w", err)
 	}
 

@@ -9,8 +9,11 @@ import (
 func (api *APIServer) ListMetricsHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	api.logger.Info("ListMetricsHandler called")
+
 	allKeysAndMetrics, err := api.dao.GetAll(ctx)
 	if err != nil {
+		api.logger.Error("Error retrieving metrics", "error", err)
 		http.Error(w, fmt.Sprintf("Error retrieving metrics: %v", err),
 			http.StatusInternalServerError)
 		return
@@ -24,7 +27,7 @@ func (api *APIServer) ListMetricsHandler(w http.ResponseWriter, r *http.Request)
 	// This avoids allocating the entire JSON in memory
 	if err := json.NewEncoder(w).Encode(allKeysAndMetrics); err != nil {
 		// Can't send error response after WriteHeader, just log it
-		fmt.Printf("Error encoding metrics to JSON: %v\n", err)
+		api.logger.Error("Error encoding metrics to JSON", "error", err)
 		return
 	}
 }

@@ -2,17 +2,20 @@ package service
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/yaron8/telemetry-infra/ingester/config"
 	"github.com/yaron8/telemetry-infra/ingester/dao"
+	"github.com/yaron8/telemetry-infra/logi"
 )
 
 type APIServer struct {
 	config *config.Config
 	server *http.Server
 	dao    *dao.DAOMetrics
+	logger *slog.Logger
 }
 
 func NewAPIServer(config *config.Config, dao *dao.DAOMetrics) *APIServer {
@@ -20,11 +23,13 @@ func NewAPIServer(config *config.Config, dao *dao.DAOMetrics) *APIServer {
 	return &APIServer{
 		config: config,
 		dao:    dao,
+		logger: logi.GetLogger(),
 	}
 }
 
 // Start initializes and starts the HTTP server
 func (api *APIServer) Start() error {
+	api.logger.Info("Ingester APIServer starting", "port", api.config.Port)
 
 	mux := http.NewServeMux()
 
@@ -32,7 +37,7 @@ func (api *APIServer) Start() error {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte("OK")); err != nil {
-			fmt.Printf("Error writing health check response: %v\n", err)
+			api.logger.Error("Error writing health check response", "error", err)
 		}
 	})
 
@@ -48,8 +53,8 @@ func (api *APIServer) Start() error {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	fmt.Printf("Starting server on port %d\n", api.config.Port)
 	if err := api.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		api.logger.Error("Server failed to start", "error", err, "port", api.config.Port)
 		return fmt.Errorf("failed to start server: %w", err)
 	}
 
