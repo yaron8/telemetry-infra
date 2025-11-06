@@ -14,16 +14,37 @@ The system is designed to handle thousands of concurrent requests with low laten
 
 ### High-Performance Architecture
 - **Fast HTTP Server**: Optimized for high throughput with non-blocking I/O operations, achieving 15,000+ requests/sec for point queries and 3,000+ requests/sec for bulk operations with sub-20ms average latency.
+
 - **Lock-Free Concurrency**: The ingester service is designed without traditional locking mechanisms, utilizing Go's goroutines and channels for safe concurrent operations, eliminating contention and improving scalability under heavy load.
+
 - **Non-Blocking Operations**: All I/O operations are non-blocking, leveraging Redis pipelining for batch operations and SCAN instead of blocking KEYS commands, ensuring the system remains responsive under high concurrency.
 
+### Data Ingestion & Processing
+- **Background ETL Pipeline**: Runs in a separate goroutine (thread) with a pull-based architecture where the ingester periodically fetches data from the generator without blocking the HTTP server. Features include:
+  - **Streaming CSV parsing**: Memory-efficient line-by-line processing instead of loading entire responses into memory
+
+  - **HTTP 304 optimization**: Respects `Not Modified` responses to skip unnecessary processing and reduce bandwidth
+
+  - **Time-based partitioning**: Redis keys use `{timestamp}/{switch_id}` format enabling efficient range queries and time-series operations
+
+  - **Fault tolerance**: Continues processing even if individual records fail, with detailed error tracking and logging
+
+  - **Smart timestamping**: Tracks last update time in Redis for efficient incremental queries
+
 ### Data Storage & Retrieval
-- **Redis Backend**: Utilizes Redis as the primary data store for metrics, providing low-latency access with efficient key-value operations. Implements Redis pipelining to reduce round-trips and batch fetch operations for optimal performance.
+- **Redis Backend**: Utilizes Redis as the primary data store for metrics, providing low-latency access with efficient key-value operations. 
+Implements Redis pipelining to reduce round-trips and batch fetch operations for optimal performance.
 
 ### Reliability & Quality Assurance
-- **Integration Tests**: Full test coverage for all use cases including edge cases, error scenarios, and concurrent operations. Tests validate end-to-end functionality to prevent regressions and ensure system reliability.
-- **Error Handling**: Proper HTTP status codes for all scenarios (400 for bad requests, 404 for not found, 500 for server errors), with detailed error messages. All error paths are handled gracefully without panics or undefined behavior.
+- **Integration Tests**: Full test coverage for all use cases including edge cases, error scenarios, and concurrent operations. 
+Tests validate end-to-end functionality to prevent regressions and ensure system reliability.
+- **Error Handling**: Proper HTTP status codes for all scenarios (400 for bad requests, 404 for not found, 500 for server errors), with detailed error messages. 
+All error paths are handled gracefully without panics or undefined behavior.
 - **Logging**: Informative logs at appropriate levels (info, error) throughout the system, providing visibility into operations and errors for debugging and monitoring in production environments.
+
+### Configuration Management
+- **Centralized Configuration**: Each service has its own dedicated config package with all settings defined in a single location, making it simple to modify parameters without searching through code. Configuration includes server ports, Redis connection details, ETL intervals, cache TTLs, and data retention policies.
+- **Environment-Based Configuration**: Follows 12-factor app principles with environment variable support, providing sensible defaults for local development while allowing easy overrides for Docker and production environments.
 
 ### Deployment & Development
 - **Docker Support**: Complete containerization with Docker Compose orchestration, enabling easy deployment of both services (generator and ingester) along with Redis. Supports development, testing, and production environments with consistent behavior.
