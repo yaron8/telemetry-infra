@@ -1,5 +1,33 @@
 # Telemetry Infrastructure
 
+## About
+
+This project provides a high-performance telemetry infrastructure for network metrics management. It consists of two main services:
+
+- **Generator**: Simulates network switches and generates telemetry data, sending metrics to the ingester service for testing and demonstration purposes.
+
+- **Ingester**: Receives, processes, and stores telemetry data from switches (or the generator) via HTTP APIs, with a Redis-backed storage layer for efficient data retrieval.
+
+The system is designed to handle thousands of concurrent requests with low latency, making it suitable for real-time network monitoring and analytics applications.
+
+## Key Features & Technical Highlights
+
+### High-Performance Architecture
+- **Fast HTTP Server**: Optimized for high throughput with non-blocking I/O operations, achieving 15,000+ requests/sec for point queries and 3,000+ requests/sec for bulk operations with sub-20ms average latency.
+- **Lock-Free Concurrency**: The ingester service is designed without traditional locking mechanisms, utilizing Go's goroutines and channels for safe concurrent operations, eliminating contention and improving scalability under heavy load.
+- **Non-Blocking Operations**: All I/O operations are non-blocking, leveraging Redis pipelining for batch operations and SCAN instead of blocking KEYS commands, ensuring the system remains responsive under high concurrency.
+
+### Data Storage & Retrieval
+- **Redis Backend**: Utilizes Redis as the primary data store for metrics, providing low-latency access with efficient key-value operations. Implements Redis pipelining to reduce round-trips and batch fetch operations for optimal performance.
+
+### Reliability & Quality Assurance
+- **Integration Tests**: Full test coverage for all use cases including edge cases, error scenarios, and concurrent operations. Tests validate end-to-end functionality to prevent regressions and ensure system reliability.
+- **Error Handling**: Proper HTTP status codes for all scenarios (400 for bad requests, 404 for not found, 500 for server errors), with detailed error messages. All error paths are handled gracefully without panics or undefined behavior.
+- **Logging**: Informative logs at appropriate levels (info, error) throughout the system, providing visibility into operations and errors for debugging and monitoring in production environments.
+
+### Deployment & Development
+- **Docker Support**: Complete containerization with Docker Compose orchestration, enabling easy deployment of both services (generator and ingester) along with Redis. Supports development, testing, and production environments with consistent behavior.
+
 ## Performance Results
 
 ### Setup
