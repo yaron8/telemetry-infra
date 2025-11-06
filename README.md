@@ -71,9 +71,15 @@ curl "http://localhost:8080/telemetry/GetMetric?switch_id=sw1&metric=latency_ms"
 - **Redis Backend**: Utilizes Redis as the primary data store for metrics, chosen specifically to enable stateless microservices architecture. By externalizing all state to Redis, the services can scale horizontally across multiple instances without coordination. Provides low-latency access with efficient key-value operations, and implements Redis pipelining to reduce round-trips and batch fetch operations for optimal performance.
 
 ### Reliability & Quality Assurance
-- **Integration Tests**: Full test coverage for all use cases including edge cases, error scenarios, and concurrent operations. 
+- **GitHub CI/CD**: Fully functional GitHub Actions workflow that automates quality checks on every push and pull request, including:
+  - **Build verification**: Ensures both generator and ingester services compile successfully
+  - **Lint checks**: Runs `golangci-lint` to enforce code quality standards and catch potential issues
+  - **Generator integration tests**: Validates generator service functionality in isolation
+  - **Ingester integration tests**: Validates ingester service end-to-end behavior with Redis backend
+  - All tests run in a containerized environment using Docker Compose for consistency
+- **Integration Tests**: Full test coverage for all use cases including edge cases, error scenarios, and concurrent operations.
 Tests validate end-to-end functionality to prevent regressions and ensure system reliability.
-- **Error Handling**: Proper HTTP status codes for all scenarios (400 for bad requests, 404 for not found, 500 for server errors), with detailed error messages. 
+- **Error Handling**: Proper HTTP status codes for all scenarios (400 for bad requests, 404 for not found, 500 for server errors), with detailed error messages.
 All error paths are handled gracefully without panics or undefined behavior.
 - **Logging**: Informative logs at appropriate levels (info, error) throughout the system, providing visibility into operations and errors for debugging and monitoring in production environments.
 
