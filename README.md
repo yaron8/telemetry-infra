@@ -13,6 +13,8 @@ The system is designed to handle thousands of concurrent requests with low laten
 ## Key Features & Technical Highlights
 
 ### High-Performance Architecture
+- **Stateless Microservices Design**: Both services are designed to be completely stateless, storing all state externally in Redis. This architecture enables horizontal scaling by running multiple instances of each service in a cluster without coordination overhead, making it ideal for cloud-native and microservices deployments.
+
 - **Fast HTTP Server**: Optimized for high throughput with non-blocking I/O operations, achieving 15,000+ requests/sec for point queries and 3,000+ requests/sec for bulk operations with sub-20ms average latency.
 
 - **Lock-Free Concurrency**: The ingester service is designed without traditional locking mechanisms, utilizing Go's goroutines and channels for safe concurrent operations, eliminating contention and improving scalability under heavy load.
@@ -32,8 +34,7 @@ The system is designed to handle thousands of concurrent requests with low laten
   - **Smart timestamping**: Tracks last update time in Redis for efficient incremental queries
 
 ### Data Storage & Retrieval
-- **Redis Backend**: Utilizes Redis as the primary data store for metrics, providing low-latency access with efficient key-value operations. 
-Implements Redis pipelining to reduce round-trips and batch fetch operations for optimal performance.
+- **Redis Backend**: Utilizes Redis as the primary data store for metrics, chosen specifically to enable stateless microservices architecture. By externalizing all state to Redis, the services can scale horizontally across multiple instances without coordination. Provides low-latency access with efficient key-value operations, and implements Redis pipelining to reduce round-trips and batch fetch operations for optimal performance.
 
 ### Reliability & Quality Assurance
 - **Integration Tests**: Full test coverage for all use cases including edge cases, error scenarios, and concurrent operations. 
@@ -61,6 +62,42 @@ The system follows a distributed architecture with three main components:
 - **Generator Service**: Simulates network switches and generates telemetry data in CSV format. Implements smart caching with HTTP 304 responses to optimize bandwidth.
 - **Ingester Service**: Pulls data from the generator via HTTP, processes it through a background ETL pipeline, and serves query requests through RESTful APIs.
 - **Redis**: Acts as the central data store, providing fast key-value access for metric storage and retrieval.
+
+### Detailed Architecture
+
+![Detailed Architecture](images/hld_detailed.jpg)
+
+**Component Breakdown:**
+
+**Generator Service:**
+- **HTTP Server**: Exposes REST API endpoint for telemetry data retrieval
+- **CSV Generator**: Creates metric records in CSV format with configurable switch IDs and metric types
+- **Cache Manager**: Implements time-based caching (TTL) with thread-safe, returns HTTP 304 when data hasn't changed
+- **Config**: Centralized configuration for server port, cache TTL, and data generation parameters
+
+**Ingester Service:**
+- **HTTP Server**: Serves two main API endpoints:
+  - `GetMetric`: Retrieves specific metric for a switch
+  - `ListMetrics`: Returns all metrics with optional filtering by last update time
+- **ETL Pipeline**: Background goroutine that:
+  - Periodically pulls data from Generator via HTTP (configured to 10s)
+  - Parses CSV stream line-by-line for memory efficiency
+  - Validates and transforms data before storage
+- **Config**: Centralized configuration for server port, Redis connection, ETL interval, and data retention
+
+**Data Flow:**
+1. **Data Generation**: Generator creates metrics in CSV format and stores them as a snapshot for 10 seconds (configurable)
+2. **ETL Pull**: Ingester's background pipeline periodically requests data from Generator
+3. **Snapshot Check**: Generator returns either fresh snapshot data (200) or not modified (304) if snapshot hasn't expired
+4. **Data Processing**: ETL parses CSV stream line-by-line, validates fields, and prepares records
+5. **Storage**: DAO stores metrics in Redis with time-based keys and TTL
+6. **Response**: Client queries hit the HTTP server, which retrieves data from Redis via DAO and returns metrics as JSON with streaming encoding
+
+### Sequence Diagrams
+
+#### Generator /counter Endpoint
+
+![Generator Counter Sequence](images/seq_generator.jpg)
 
 ## Performance Results
 
