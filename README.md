@@ -83,9 +83,13 @@ curl "http://localhost:8080/telemetry/GetMetric?switch_id=sw1&metric=latency_ms"
   - All tests run in a containerized environment using Docker Compose for consistency
 - **Integration Tests**: Full test coverage for all use cases including edge cases, error scenarios, and concurrent operations.
 Tests validate end-to-end functionality to prevent regressions and ensure system reliability and fault tolerance.
+
 - **Error Handling**: Proper HTTP status codes for all scenarios (400 for bad requests, 404 for not found, 500 for server errors), with detailed error messages.
 All error paths are handled gracefully without panics or undefined behavior.
+
 - **Logging**: Informative logs at appropriate levels (info, error) throughout the system, providing visibility into operations and errors for debugging and monitoring in production environments.
+
+  ![System Logs](images/log_screenshot.png)
 
 ### Configuration Management
 - **Centralized Configuration**: Each service has its own dedicated config package with all settings defined in a single location, making it simple to modify parameters without searching through code. Configuration includes server ports, Redis connection details, ETL intervals, cache TTLs, and data retention policies.
