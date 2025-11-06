@@ -31,7 +31,10 @@ func (s *IntegrationTestSuite) SetupSuite() {
 	// Start docker-compose
 	s.T().Log("Starting docker-compose services...")
 	s.dockerComposeCmd = exec.CommandContext(s.ctx, "docker-compose", "up", "--build")
-	s.dockerComposeCmd.Dir = "/Users/yaronisraeli/dev/nvidia/telemetry-infra"
+
+	// Use relative path - go up two directories from integration_tests to project root
+	projectRoot := "../.."
+	s.dockerComposeCmd.Dir = projectRoot
 	s.dockerComposeCmd.Stdout = os.Stdout
 	s.dockerComposeCmd.Stderr = os.Stderr
 
@@ -54,7 +57,7 @@ func (s *IntegrationTestSuite) TearDownSuite() {
 
 	// Run docker-compose down to clean up
 	downCmd := exec.Command("docker-compose", "down")
-	downCmd.Dir = "/Users/yaronisraeli/dev/nvidia/telemetry-infra"
+	downCmd.Dir = "../.."
 	downCmd.Stdout = os.Stdout
 	downCmd.Stderr = os.Stderr
 

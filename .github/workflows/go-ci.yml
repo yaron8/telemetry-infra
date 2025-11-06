@@ -79,7 +79,7 @@ jobs:
 
       - name: Run tests
         working-directory: generator/integration_tests
-        run: go test ./... -v
+        run: go test -v .
 
   test-ingester:
     name: Tests (ingester/integration_tests)
@@ -105,4 +105,4 @@ jobs:
 
       - name: Run tests
         working-directory: ingester/integration_tests
-        run: go test ./... -v
+        run: go test -v .
