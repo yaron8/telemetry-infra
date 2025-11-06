@@ -10,6 +10,40 @@ This project provides a high-performance telemetry infrastructure for network me
 
 The system is designed to handle thousands of concurrent requests with low latency, making it suitable for real-time network monitoring and analytics applications.
 
+## Getting Started
+
+### Prerequisites
+
+- Docker and Docker Compose installed on your system
+- No additional dependencies required (all services run in containers)
+
+### Running the System
+
+**Build and start all services:**
+```bash
+docker-compose up --build
+```
+This command will:
+- Build Docker images for both Generator and Ingester services
+- Start Redis container
+- Start Generator service on port 9001
+- Start Ingester service on port 8080
+- The Ingester will automatically begin pulling data from the Generator via the background ETL pipeline
+
+### Testing the APIs
+
+Once the system is running, you can test the endpoints:
+
+**List all metrics:**
+```bash
+curl "http://localhost:8080/telemetry/ListMetrics"
+```
+
+**Get a specific metric:**
+```bash
+curl "http://localhost:8080/telemetry/GetMetric?switch_id=sw1&metric=latency_ms"
+```
+
 ## Key Features & Technical Highlights
 
 ### High-Performance Architecture
@@ -106,9 +140,48 @@ The system follows a distributed architecture with three main components:
 
 ![Redis TTL Sequence](images/seq_redis_ttl.jpg)
 
+## Why Redis?
 
+I chose Redis as the storage layer for telemetry metrics because it fits the system's requirements for low-latency, high-frequency, real-time data access. The assignment expects the API server to serve updated metrics quickly, under concurrent load, without blocking — Redis enables exactly that.
 
+### 1. Extremely Fast (In-Memory)
 
+Telemetry updates occur every few seconds, and API requests must return in milliseconds. Redis is fully in-memory with sub-millisecond read/write operations, which ensures:
+
+- **Constant-time lookup (O(1))**: Key-value operations are instantaneous
+- **Predictable performance even under high concurrency**: No performance degradation as load increases
+- **No disk I/O penalties**: All operations happen in RAM
+
+### 2. Non-Blocking API Path
+
+The API server reads pre-ingested values directly from Redis, so clients are never blocked by an ingestion cycle, CSV parsing, or data refresh:
+
+- **Reads are independent from writes**: Query operations don't interfere with ETL pipeline
+- **Ingestion can fail or delay without affecting serving path**: API remains responsive even if generator is down
+- **Enables lock-free request handling**: Matches the system's lock-free concurrency design
+
+### 3. Industry-Standard Cache for Real-Time Systems
+
+Redis is the industry standard for fast, transient, frequently updated data especially for metrics and counters.
+
+### 4. Built-In TTL Support
+
+Telemetry is time-sensitive — old data becomes worthless. Redis allows storing each metric with a TTL, ensuring automatic expiration without manual cleanup logic:
+
+- **Automatic memory management**: Old metrics are automatically removed
+- **Configurable retention**: TTL can be adjusted based on requirements (default: 30 seconds)
+- **No garbage collection overhead**: Redis handles expiration efficiently
+
+### 5. Enables Stateless Microservices Architecture
+
+By externalizing all state to Redis, the API server becomes fully stateless, which allows:
+
+- **Horizontal scaling**: Run N API replicas with zero shared memory or coordination
+- **Rolling deployments without data loss**: New instances immediately access shared state
+- **No need for in-process locking**: All coordination happens through Redis
+- **Better fault tolerance**: API crashes don't lose data — state persists in Redis
+
+This stateless design enables the architecture to scale horizontally by simply adding more service instances, making it production-ready for cloud-native deployments.
 
 ## Performance Results
 
