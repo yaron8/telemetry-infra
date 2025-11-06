@@ -152,7 +152,7 @@ func (dao *DAOMetrics) GetMetric(ctx context.Context, switchID string, metric st
 	// Check if the metric exists in the map
 	value, exists := metricMap[metric]
 	if !exists {
-		return nil, fmt.Errorf("metric '%s' does not exist in key '%s'", metric, key)
+		return nil, fmt.Errorf("metric does not exist")
 	}
 
 	return value, nil

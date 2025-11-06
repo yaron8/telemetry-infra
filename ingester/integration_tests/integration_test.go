@@ -219,3 +219,47 @@ func (s *IntegrationTestSuite) TestGetMetricEndpoint_UnknownSwitchId() {
 	body := string(bodyBytes)
 	assert.Equal(s.T(), "switch_id does not exist\n", body, "Expected error message 'switch_id does not exist'")
 }
+
+// TestGetMetricEndpoint_UnknownMetric tests the /telemetry/GetMetric endpoint with unknown metric
+func (s *IntegrationTestSuite) TestGetMetricEndpoint_UnknownMetric() {
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	resp, err := client.Get(ingesterBaseURL + "/telemetry/GetMetric?switch_id=sw5&metric=unknown_metric_test")
+	s.Require().NoError(err, "Failed to make request to /telemetry/GetMetric endpoint")
+	defer resp.Body.Close()
+
+	// Assert status code is 404
+	assert.Equal(s.T(), http.StatusNotFound, resp.StatusCode, "Expected status code 404")
+
+	// Read response body
+	bodyBytes, err := io.ReadAll(resp.Body)
+	s.Require().NoError(err, "Failed to read response body")
+
+	// Assert the error message
+	body := string(bodyBytes)
+	assert.Equal(s.T(), "metric does not exist\n", body, "Expected error message 'metric does not exist'")
+}
+
+// TestGetMetricEndpoint_UnknownSwitchId tests the /telemetry/GetMetric endpoint with unknown switch_id
+func (s *IntegrationTestSuite) TestGetMetricEndpoint_UnknownSwitchIdAndMetric() {
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	resp, err := client.Get(ingesterBaseURL + "/telemetry/GetMetric?switch_id=unknown_sw&metric=unknown_metric_test")
+	s.Require().NoError(err, "Failed to make request to /telemetry/GetMetric endpoint")
+	defer resp.Body.Close()
+
+	// Assert status code is 404
+	assert.Equal(s.T(), http.StatusNotFound, resp.StatusCode, "Expected status code 404")
+
+	// Read response body
+	bodyBytes, err := io.ReadAll(resp.Body)
+	s.Require().NoError(err, "Failed to read response body")
+
+	// Assert the error message
+	body := string(bodyBytes)
+	assert.Equal(s.T(), "switch_id does not exist\n", body, "Expected error message 'switch_id does not exist'")
+}
