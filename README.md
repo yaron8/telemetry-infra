@@ -49,7 +49,7 @@ curl "http://localhost:8080/telemetry/GetMetric?switch_id=sw1&metric=latency_ms"
 ### High-Performance Architecture
 - **Stateless Microservices Design**: Both services are designed to be completely stateless, storing all state externally in Redis. This architecture enables horizontal scaling by running multiple instances of each service in a cluster without coordination overhead, making it ideal for cloud-native and microservices deployments.
 
-- **Fast HTTP Server**: Optimized for high throughput with non-blocking I/O operations, achieving 15,000+ requests/sec for point queries and 3,000+ requests/sec for bulk operations with sub-20ms average latency.
+- **Fast HTTP Server**: Optimized for high throughput with non-blocking I/O operations, achieving 15,000+ requests/sec for point queries (GetMetric) with 3.2ms average latency and 3,000+ requests/sec for bulk operations (ListMetrics) with sub-20ms average latency (as measured in [performance tests](#performance-results)).
 
 - **Lock-Free Concurrency**: The ingester service is designed without traditional locking mechanisms, utilizing Go's goroutines and channels for safe concurrent operations, eliminating contention and improving scalability under heavy load.
 
