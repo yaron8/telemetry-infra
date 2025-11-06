@@ -47,7 +47,7 @@ curl "http://localhost:8080/telemetry/GetMetric?switch_id=sw1&metric=latency_ms"
 ## Key Features & Technical Highlights
 
 ### High-Performance Architecture
-- **Stateless Microservices Design**: Both services are designed to be completely stateless, storing all state externally in Redis. This architecture enables horizontal scaling by running multiple instances of each service in a cluster without coordination overhead, making it ideal for cloud-native and microservices deployments.
+- **Stateless Services Design**: Both services are designed as stateless services, storing all state externally in Redis. This architecture enables horizontal scaling by running multiple instances of each service in a cluster without coordination overhead, making it ideal for cloud-native and microservices deployments. This microservices architecture prevents any single instance from becoming a single point of failure.
 
 - **Fast HTTP Server**: Optimized for high throughput with non-blocking I/O operations, achieving 15,000+ requests/sec for point queries (GetMetric) with 3.2ms average latency and 3,000+ requests/sec for bulk operations (ListMetrics) with sub-20ms average latency (as measured in [performance tests](#performance-results)).
 
@@ -68,7 +68,7 @@ curl "http://localhost:8080/telemetry/GetMetric?switch_id=sw1&metric=latency_ms"
   - **Smart timestamping**: Tracks last update time in Redis for efficient incremental queries
 
 ### Data Storage & Retrieval
-- **Redis Backend**: Utilizes Redis as the primary data store for metrics, chosen specifically to enable stateless microservices architecture. By externalizing all state to Redis, the services can scale horizontally across multiple instances without coordination. Provides low-latency access with efficient key-value operations, and implements Redis pipelining to reduce round-trips and batch fetch operations for optimal performance.
+- **Redis Backend**: Utilizes Redis as the primary data store for metrics, chosen specifically to enable stateless microservices architecture. By externalizing all state to Redis, the services can scale horizontally across multiple instances without coordination. Redis serves as the single source of truth for all metrics data, providing low-latency access with efficient key-value operations, and implements Redis pipelining to reduce round-trips and batch fetch operations for optimal performance.
 
 ### Reliability & Quality Assurance
 - **GitHub CI/CD**: Fully functional GitHub Actions workflow that automates quality checks on every push and pull request, including:
@@ -82,7 +82,7 @@ curl "http://localhost:8080/telemetry/GetMetric?switch_id=sw1&metric=latency_ms"
   - **Ingester integration tests**: Validates ingester service end-to-end behavior with Redis backend
   - All tests run in a containerized environment using Docker Compose for consistency
 - **Integration Tests**: Full test coverage for all use cases including edge cases, error scenarios, and concurrent operations.
-Tests validate end-to-end functionality to prevent regressions and ensure system reliability.
+Tests validate end-to-end functionality to prevent regressions and ensure system reliability and fault tolerance.
 - **Error Handling**: Proper HTTP status codes for all scenarios (400 for bad requests, 404 for not found, 500 for server errors), with detailed error messages.
 All error paths are handled gracefully without panics or undefined behavior.
 - **Logging**: Informative logs at appropriate levels (info, error) throughout the system, providing visibility into operations and errors for debugging and monitoring in production environments.
@@ -366,7 +366,7 @@ In this architecture, we decouple the ETL logic from the Ingester service by mov
 **Pros:**
 - **True Microservices Architecture with Horizontal Scalability**: With a simple architectural change (moving ETL to Airflow), the Ingester service becomes fully horizontally scalable. Multiple Ingester instances can run independently without coordination, as the single ETL process in Airflow handles all data ingestion. This transforms the system into a true microservices architecture where the API layer scales seamlessly.
 - **Single ETL Process**: Airflow ensures only one ETL job runs at a time (per schedule), eliminating the need for coordination or deduplication logic between multiple service instances.
-- **Separation of Concerns**: Data ingestion (write path) and data serving (read path) are completely decoupled, improving maintainability and fault isolation. Changes to ETL logic don't require redeploying API servers.
+- **Separation of Concerns**: Data ingestion (write path) and data serving (read path) are completely decoupled, improving maintainability and fault isolation. Changes to ETL logic don't require redeploying API servers. This decoupling ensures loosely coupled components that can evolve independently.
 - **Simplified Ingester Design**: The Ingester service becomes stateless and simpler, focusing solely on serving API requests without background thread management.
 - **Independent Resource Management**: ETL and API serving can be scaled independently based on their respective load patterns. For example, scale API servers during peak query times without affecting ETL resources.
 
@@ -405,7 +405,7 @@ This architecture takes a fundamentally different approach by introducing Apache
   - Scale Metrics Viewer based on **HTTP request rate** or **response latency**
   - Scale based on **CPU/memory utilization** for both services
 
-- **Decoupled Data Flow**: Kafka acts as a buffer, decoupling producers from consumers. If Metrics Updater instances are down or slow, Kafka retains messages without affecting Airflow or data loss.
+- **Decoupled Data Flow**: Kafka acts as a buffer, decoupling producers from consumers. If Metrics Updater instances are down or slow, Kafka retains messages with durability guarantees, preventing data loss and improving overall system fault tolerance.
 
 - **Replay and Recovery**: Kafka's message retention allows replaying historical metrics for recovery, reprocessing, or debugging scenarios.
 
