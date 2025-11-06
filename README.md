@@ -72,6 +72,10 @@ curl "http://localhost:8080/telemetry/GetMetric?switch_id=sw1&metric=latency_ms"
 
 ### Reliability & Quality Assurance
 - **GitHub CI/CD**: Fully functional GitHub Actions workflow that automates quality checks on every push and pull request, including:
+
+  ![GitHub Actions CI Pipeline](images/git_action_ci.png)
+
+  [View Workflow Runs](https://github.com/yaron8/telemetry-infra/actions)
   - **Build verification**: Ensures both generator and ingester services compile successfully
   - **Lint checks**: Runs `golangci-lint` to enforce code quality standards and catch potential issues
   - **Generator integration tests**: Validates generator service functionality in isolation
