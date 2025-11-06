@@ -72,6 +72,11 @@ jobs:
       - name: Download deps
         run: go mod download
 
+      - name: Create docker-compose symlink
+        run: |
+          sudo ln -s $(which docker) /usr/local/bin/docker-compose 2>/dev/null || true
+          docker compose version
+
       - name: Run tests
         working-directory: generator/integration_tests
         run: go test ./... -v
@@ -92,6 +97,11 @@ jobs:
 
       - name: Download deps
         run: go mod download
+
+      - name: Create docker-compose symlink
+        run: |
+          sudo ln -s $(which docker) /usr/local/bin/docker-compose 2>/dev/null || true
+          docker compose version
 
       - name: Run tests
         working-directory: ingester/integration_tests
