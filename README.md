@@ -99,6 +99,17 @@ The system follows a distributed architecture with three main components:
 
 ![Generator Counter Sequence](images/seq_generator.jpg)
 
+<br>
+<br>
+
+#### Redis Key Storage and TTL Management
+
+![Redis TTL Sequence](images/seq_redis_ttl.jpg)
+
+
+
+
+
 ## Performance Results
 
 ### Setup
