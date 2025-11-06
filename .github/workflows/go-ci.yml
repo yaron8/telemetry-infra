@@ -72,10 +72,12 @@ jobs:
       - name: Download deps
         run: go mod download
 
-      - name: Create docker-compose symlink
+      - name: Create docker-compose wrapper
         run: |
-          sudo ln -s $(which docker) /usr/local/bin/docker-compose 2>/dev/null || true
-          docker compose version
+          echo '#!/bin/bash' | sudo tee /usr/local/bin/docker-compose
+          echo 'exec docker compose "$@"' | sudo tee -a /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          docker-compose version
 
       - name: Run tests
         working-directory: generator/integration_tests
@@ -98,10 +100,12 @@ jobs:
       - name: Download deps
         run: go mod download
 
-      - name: Create docker-compose symlink
+      - name: Create docker-compose wrapper
         run: |
-          sudo ln -s $(which docker) /usr/local/bin/docker-compose 2>/dev/null || true
-          docker compose version
+          echo '#!/bin/bash' | sudo tee /usr/local/bin/docker-compose
+          echo 'exec docker compose "$@"' | sudo tee -a /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          docker-compose version
 
       - name: Run tests
         working-directory: ingester/integration_tests
