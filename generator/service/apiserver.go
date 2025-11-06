@@ -2,28 +2,34 @@ package service
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/yaron8/telemetry-infra/generator/config"
 	"github.com/yaron8/telemetry-infra/generator/metrics"
+	"github.com/yaron8/telemetry-infra/logi"
 )
 
 type APIServer struct {
 	csvMetrics *metrics.CSVMetrics
 	config     *config.Config
 	server     *http.Server
+	logger     *slog.Logger
 }
 
 func NewAPIServer(config *config.Config, csvMetrics *metrics.CSVMetrics) *APIServer {
 	return &APIServer{
 		config:     config,
 		csvMetrics: csvMetrics,
+		logger:     logi.GetLogger(),
 	}
 }
 
 // StartServer initializes and starts the HTTP server
 func (api *APIServer) Start() error {
+	api.logger.Info("APIServer starting", "port", api.config.Port)
+
 	mux := http.NewServeMux()
 
 	// Health check endpoint

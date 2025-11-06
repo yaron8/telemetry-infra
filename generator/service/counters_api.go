@@ -7,8 +7,11 @@ import (
 
 // countersHandler handles the /counters endpoint
 func (api *APIServer) countersHandler(w http.ResponseWriter, r *http.Request) {
+	api.logger.Info("countersHandler called")
+
 	csvMetricsResponse, err := api.csvMetrics.GetCSVMetrics()
 	if err != nil {
+		api.logger.Error("Error generating CSV metrics", "error", err)
 		http.Error(w, fmt.Sprintf("Error generating CSV metrics: %v", err),
 			http.StatusInternalServerError)
 		return

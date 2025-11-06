@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"encoding/csv"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"net/http"
 	"sync"
 	"time"
 
+	"github.com/yaron8/telemetry-infra/logi"
 	"github.com/yaron8/telemetry-infra/telemetrics"
 )
 
@@ -18,6 +20,7 @@ type CSVMetrics struct {
 	mu                      sync.RWMutex
 	snapshotLastTimeUpdated time.Time
 	snapshotTTL             time.Duration
+	logger                  *slog.Logger
 }
 
 type CSVMetricsResponse struct {
@@ -28,12 +31,13 @@ type CSVMetricsResponse struct {
 func NewCSVMetrics(snapshotTTL time.Duration) *CSVMetrics {
 	return &CSVMetrics{
 		snapshotTTL: snapshotTTL,
+		logger:      logi.GetLogger(),
 	}
 }
 
 // GetCSVMetrics generates CSV formatted metrics data with caching
 func (cm *CSVMetrics) GetCSVMetrics() (*CSVMetricsResponse, error) {
-	// Check if snapshot is valid
+	// Check if snapshot is valid (hot path - no logging for performance)
 	cm.mu.RLock()
 	if time.Since(cm.snapshotLastTimeUpdated) < cm.snapshotTTL {
 		cm.mu.RUnlock()
@@ -55,6 +59,9 @@ func (cm *CSVMetrics) GetCSVMetrics() (*CSVMetricsResponse, error) {
 			HTTPResponseCode: http.StatusOK,
 		}, nil
 	}
+
+	// Only log when actually generating new data (cold path)
+	cm.logger.Info("Generating new CSV metrics", "num_lines", numOfDataLines)
 
 	// Create a buffer to write CSV data to
 	var buf bytes.Buffer
@@ -101,6 +108,11 @@ func (cm *CSVMetrics) GetCSVMetrics() (*CSVMetricsResponse, error) {
 	// Save to snapshot
 	snapshot := buf.String()
 	cm.snapshotLastTimeUpdated = time.Now()
+
+	cm.logger.Info("CSV metrics generated successfully",
+		"data_size_bytes", len(snapshot),
+		"num_lines", numOfDataLines,
+		"timestamp", currTimestamp)
 
 	return &CSVMetricsResponse{
 		CSVData:          snapshot,
