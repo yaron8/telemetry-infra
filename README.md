@@ -370,3 +370,39 @@ In this architecture, we decouple the ETL logic from the Ingester service by mov
 - **Mixed Responsibilities**: The current Ingester service violates microservices principles by handling two different concerns: (a) consuming metrics from Generator and storing them in Redis, and (b) exposing RESTful APIs for clients to query metrics. This tight coupling makes the service harder to maintain and scale independently.
 - **Doesn't Solve ETL Processing Bottleneck**: While this architecture solves the HTTP request scaling issue (multiple Ingester instances can serve client requests), it doesn't address how to handle huge volumes of metrics arriving in a single ETL pull from the Generator. The ETL process remains a single-threaded bottleneck that cannot be parallelized across multiple workers.
 
+---
+
+### Architecture 2: Event-Driven Architecture with Kafka
+
+This architecture takes a fundamentally different approach by introducing Apache Kafka as a streaming platform and splitting the Ingester service into two independent microservices.
+
+![Event-Driven Architecture with Kafka](images/new_architecture_2.jpg)
+
+**Key Changes:**
+- **Airflow as Producer**: Airflow pulls CSV data from the Generator service and produces metrics as messages to a Kafka topic
+- **Ingester Service Split**: The monolithic Ingester service is decomposed into two independent microservices:
+  1. **Metrics Updater Service**: Consumes metrics from Kafka and writes them to Redis. Can be horizontally scaled with multiple consumer instances in a Kafka consumer group
+  2. **Metrics Viewer Service**: Handles all client HTTP requests and performs only read operations from Redis. Can be horizontally scaled based on query load
+- **Kafka as Message Broker**: Provides a durable, scalable buffer between data ingestion and storage, enabling independent scaling of producers and consumers
+- **Redis**: Continues to serve as the shared data store for metrics
+
+**Pros:**
+- **True Microservices Architecture**: Solves the mixed responsibilities problem from Architecture 1 by separating concerns into dedicated services. Each service has a single, well-defined responsibility: Airflow produces to Kafka, Metrics Updater consumes and writes, Metrics Viewer reads and serves.
+- **Horizontal Scalability for Both Read and Write Paths**:
+  - Multiple Metrics Updater instances can consume from Kafka partitions in parallel, solving the ETL processing bottleneck from Architecture 1
+  - Multiple Metrics Viewer instances can handle high volumes of client requests independently
+  - Each service scales independently based on its specific load patterns
+- **Handles Very High Scale**: Designed for enterprise-scale deployments with massive metric volumes and high request rates. Kafka's distributed architecture and partitioning enable processing millions of metrics per second.
+- **Kubernetes Auto-Scaling**: Integrates seamlessly with K8s Horizontal Pod Autoscaler (HPA) using relevant metrics:
+  - Scale Metrics Updater based on **Kafka consumer lag** (number of unconsumed messages)
+  - Scale Metrics Viewer based on **HTTP request rate** or **response latency**
+  - Scale based on **CPU/memory utilization** for both services
+- **Decoupled Data Flow**: Kafka acts as a buffer, decoupling producers from consumers. If Metrics Updater instances are down or slow, Kafka retains messages without affecting Airflow or data loss.
+- **Replay and Recovery**: Kafka's message retention allows replaying historical metrics for recovery, reprocessing, or debugging scenarios.
+- **Independent Deployment**: Each service (Airflow DAG, Metrics Updater, Metrics Viewer) can be deployed, updated, and scaled independently without affecting others.
+
+**Cons:**
+- **Significantly Higher Infrastructure Complexity**: Requires deploying and managing Apache Kafka (including Zookeeper or KRaft), Airflow, two microservices, and Redis. This adds substantial operational overhead.
+- **Increased Operational Costs**: More infrastructure components mean higher cloud costs for compute, storage, and network resources.
+- **Over-Engineering for Small Scale**: For low to moderate traffic, this architecture's complexity may not be justified. The current simple architecture or Architecture 1 would suffice.
+
