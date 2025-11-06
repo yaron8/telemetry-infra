@@ -140,6 +140,39 @@ The system follows a distributed architecture with three main components:
 
 ![Redis TTL Sequence](images/seq_redis_ttl.jpg)
 
+**TTL Strategy and Data Availability:**
+
+The system uses a 30-second TTL for metrics while ingesting new data every 10 seconds. This 3x overlap is intentional and critical for ensuring continuous data availability.
+
+**The Problem: Non-Atomic TTL Operations**
+
+Redis TTL expiration and key insertion are not atomic operations. Without overlapping TTLs, there would be a race condition during data refresh:
+
+1. Old keys expire at T=10s
+2. ETL fetches new data (network latency + parsing time)
+3. New keys are inserted at T=10.5s
+
+During this 500ms window, `ListMetrics` queries would return incomplete or empty results, creating gaps in data availability.
+
+**The Solution: Overlapping TTL Windows**
+
+By setting TTL to 30 seconds (3x the ingestion interval), we maintain at least 2-3 generations of data in Redis simultaneously:
+
+- **Generation 1**: T=0s, expires at T=30s
+- **Generation 2**: T=10s, expires at T=40s
+- **Generation 3**: T=20s, expires at T=50s
+
+This overlap guarantees that data is always present, even during ETL delays, network issues, or generator downtime.
+
+**Ordered Write Pattern:**
+
+The ETL pipeline follows a specific write order to prevent partial reads:
+
+1. **Insert all metric keys** with their values and TTL
+2. **Update `last_time_updated` key** as the final operation
+
+This ensures that the `last_time_updated` key always points to a complete dataset. If a client queries between steps 1 and 2, they receive the previous complete snapshot. Once step 2 completes, all subsequent queries return the new complete dataset. This pattern prevents clients from ever seeing partial or inconsistent data during updates.
+
 ## Why Redis?
 
 I chose Redis as the storage layer for telemetry metrics because it fits the system's requirements for low-latency, high-frequency, real-time data access. The assignment expects the API server to serve updated metrics quickly, under concurrent load, without blocking — Redis enables exactly that.
