@@ -4,10 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/yaron8/telemetry-infra/telemetrics"
+)
+
+const (
+	LastUpdateTimeKey = "last_update_time"
 )
 
 // DAOMetrics handles telemetry metrics storage and retrieval
@@ -24,27 +29,47 @@ func NewDAOMetrics(redisClient *redis.Client, ttl time.Duration) *DAOMetrics {
 	}
 }
 
-// AddKey saves a MetricRecord to Redis with the given key
-func (dao *DAOMetrics) AddKey(ctx context.Context, key string, record telemetrics.MetricRecord) error {
+// AddMetric saves a MetricRecord to Redis with the given key
+func (dao *DAOMetrics) AddMetric(ctx context.Context,
+	timestamp int64,
+	switchID string,
+	record telemetrics.MetricRecord) error {
 	data, err := json.Marshal(record)
 	if err != nil {
 		return err
 	}
 
+	// Build the Redis key
+	key := dao.buildMetricKey(timestamp, switchID)
+
+	// Store the JSON data in Redis with TTL
 	return dao.redisClient.Set(ctx, key, data, dao.ttl).Err()
+}
+
+func (dao *DAOMetrics) SetLastUpdateTime(ctx context.Context, timestamp int64) error {
+	return dao.redisClient.Set(ctx, LastUpdateTimeKey, timestamp, 0).Err()
 }
 
 // GetAll retrieves all metrics from Redis and returns them as a slice of maps
 // Each map contains a single key-value pair where the key is the Redis key
 // and the value is the MetricRecord
 func (dao *DAOMetrics) GetAll(ctx context.Context) ([]map[string]telemetrics.MetricRecord, error) {
+	// Get last time updated to build the search pattern
+	lastTimeUpdated, err := dao.getLastTimeUpdated(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving last update time: %w", err)
+	}
+
+	// Build the pattern: <last_time_updated>/*
+	pattern := fmt.Sprintf("%d/*", lastTimeUpdated)
+
 	// Use SCAN instead of KEYS to avoid blocking Redis
 	var keys []string
 	var cursor uint64
 	for {
 		var scanKeys []string
 		var err error
-		scanKeys, cursor, err = dao.redisClient.Scan(ctx, cursor, "*", 100).Result()
+		scanKeys, cursor, err = dao.redisClient.Scan(ctx, cursor, pattern, 100).Result()
 		if err != nil {
 			return nil, err
 		}
@@ -85,9 +110,16 @@ func (dao *DAOMetrics) GetAll(ctx context.Context) ([]map[string]telemetrics.Met
 			continue
 		}
 
-		// Add to result as a map with single key-value pair
+		// Parse the key to extract switchID (remove timestamp prefix)
+		_, switchID, err := dao.parseMetricKey(keys[i])
+		if err != nil {
+			fmt.Printf("Error parsing key %s: %v\n", keys[i], err)
+			continue
+		}
+
+		// Add to result as a map with single key-value pair using switchID only
 		result = append(result, map[string]telemetrics.MetricRecord{
-			keys[i]: record,
+			switchID: record,
 		})
 	}
 
@@ -96,7 +128,15 @@ func (dao *DAOMetrics) GetAll(ctx context.Context) ([]map[string]telemetrics.Met
 
 // GetMetric retrieves a specific metric value for a given key from Redis
 // Returns the metric value as interface{}, or an error if key or metric doesn't exist
-func (dao *DAOMetrics) GetMetric(ctx context.Context, key string, metric string) (interface{}, error) {
+func (dao *DAOMetrics) GetMetric(ctx context.Context, switchID string, metric string) (interface{}, error) {
+	lastTimeUpdated, err := dao.getLastTimeUpdated(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving last update time: %w", err)
+	}
+
+	// Build the key using last update time and switchID
+	key := dao.buildMetricKey(lastTimeUpdated, switchID)
+
 	// Get the value for this key
 	data, err := dao.redisClient.Get(ctx, key).Result()
 	if err != nil {
@@ -116,4 +156,34 @@ func (dao *DAOMetrics) GetMetric(ctx context.Context, key string, metric string)
 	}
 
 	return value, nil
+}
+
+func (dao *DAOMetrics) getLastTimeUpdated(ctx context.Context) (int64, error) {
+	// Get last time updated value
+	data, err := dao.redisClient.Get(ctx, LastUpdateTimeKey).Result()
+	if err != nil {
+		return 0, fmt.Errorf("error retrieving last update time: %w", err)
+	}
+
+	// Parse last update time
+	lastTimeUpdated, err := strconv.ParseInt(data, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("error parsing last update time: %w", err)
+	}
+
+	return lastTimeUpdated, nil
+}
+
+func (dao *DAOMetrics) buildMetricKey(timestamp int64, switchID string) string {
+	return fmt.Sprintf("%d/%s", timestamp, switchID)
+}
+
+func (dao *DAOMetrics) parseMetricKey(key string) (int64, string, error) {
+	var timestamp int64
+	var switchID string
+	n, err := fmt.Sscanf(key, "%d/%s", &timestamp, &switchID)
+	if err != nil || n != 2 {
+		return 0, "", fmt.Errorf("invalid key format: %s", key)
+	}
+	return timestamp, switchID, nil
 }

@@ -49,7 +49,7 @@ func NewConfig() *Config {
 		Redis: RedisConfig{
 			Host: redisHost,
 			Port: redisPort,
-			TTL:  10 * time.Second,
+			TTL:  30 * time.Second,
 		},
 		ETL: ETLConfig{
 			Interval:     10 * time.Second,

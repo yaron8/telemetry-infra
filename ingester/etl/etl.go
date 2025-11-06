@@ -73,6 +73,8 @@ func (etl *ETL) writeMetricsLineByLine(respBody io.ReadCloser) error {
 		return nil
 	}
 
+	lastTimeUpdated := int64(0)
+
 	lineNumber := 1
 	for scanner.Scan() {
 		lineNumber++
@@ -84,17 +86,28 @@ func (etl *ETL) writeMetricsLineByLine(respBody io.ReadCloser) error {
 		}
 
 		// Parse the CSV line into a MetricRecord
-		switchID, record, err := etl.parseCSVLine(line)
+		switchID, timestamp, record, err := etl.parseCSVLine(line)
 		if err != nil {
 			fmt.Printf("Error parsing line %d: %v\n", lineNumber, err)
 			continue
 		}
 
 		// Store the metric using the DAO
-		if err := etl.dao.AddKey(ctx, switchID, record); err != nil {
+		if err := etl.dao.AddMetric(ctx, timestamp, switchID, record); err != nil {
 			fmt.Printf("Error storing metric at line %d: %v\n", lineNumber, err)
 			continue
 		}
+
+		if timestamp > 0 {
+			lastTimeUpdated = timestamp
+		}
+	}
+
+	// Update key in Redis for last update time
+	if lastTimeUpdated > 0 {
+		etl.dao.SetLastUpdateTime(ctx, lastTimeUpdated)
+	} else {
+		fmt.Println("Error: No valid timestamp found to update last update time")
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -106,34 +119,40 @@ func (etl *ETL) writeMetricsLineByLine(respBody io.ReadCloser) error {
 
 // parseCSVLine parses a CSV line into a MetricRecord
 // Expected format: switch_id,bandwidth_mbps,latency_ms,packet_errors
-func (etl *ETL) parseCSVLine(line string) (string, telemetrics.MetricRecord, error) {
+func (etl *ETL) parseCSVLine(line string) (string, int64, telemetrics.MetricRecord, error) {
 	fields := strings.Split(line, ",")
 
-	if len(fields) != 4 {
-		return "", telemetrics.MetricRecord{}, fmt.Errorf("expected 4 fields, got %d", len(fields))
+	if len(fields) != 5 {
+		return "", 0, telemetrics.MetricRecord{}, fmt.Errorf("expected 5 fields, got %d", len(fields))
+	}
+
+	timestamp, err := strconv.ParseInt(strings.TrimSpace(fields[0]), 10, 64)
+	if err != nil {
+		return "", 0, telemetrics.MetricRecord{}, fmt.Errorf("invalid timestamp: %w", err)
 	}
 
 	// Parse bandwidth_mbps
-	bandwidthMbps, err := strconv.ParseFloat(strings.TrimSpace(fields[1]), 64)
+	bandwidthMbps, err := strconv.ParseFloat(strings.TrimSpace(fields[2]), 64)
 	if err != nil {
-		return "", telemetrics.MetricRecord{}, fmt.Errorf("invalid bandwidth_mbps: %w", err)
+		return "", 0, telemetrics.MetricRecord{}, fmt.Errorf("invalid bandwidth_mbps: %w", err)
 	}
 
 	// Parse latency_ms
-	latencyMs, err := strconv.ParseFloat(strings.TrimSpace(fields[2]), 64)
+	latencyMs, err := strconv.ParseFloat(strings.TrimSpace(fields[3]), 64)
 	if err != nil {
-		return "", telemetrics.MetricRecord{}, fmt.Errorf("invalid latency_ms: %w", err)
+		return "", 0, telemetrics.MetricRecord{}, fmt.Errorf("invalid latency_ms: %w", err)
 	}
 
 	// Parse packet_errors
-	packetErrors, err := strconv.Atoi(strings.TrimSpace(fields[3]))
+	packetErrors, err := strconv.Atoi(strings.TrimSpace(fields[4]))
 	if err != nil {
-		return "", telemetrics.MetricRecord{}, fmt.Errorf("invalid packet_errors: %w", err)
+		return "", 0, telemetrics.MetricRecord{}, fmt.Errorf("invalid packet_errors: %w", err)
 	}
 
-	switchID := strings.TrimSpace(fields[0])
+	switchID := strings.TrimSpace(fields[1])
 
 	return switchID,
+		timestamp,
 		telemetrics.MetricRecord{
 
 			BandwidthMbps: bandwidthMbps,

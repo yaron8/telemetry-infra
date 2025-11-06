@@ -66,10 +66,13 @@ func (cm *CSVMetrics) GetCSVMetrics() (*CSVMetricsResponse, error) {
 		return nil, fmt.Errorf("error writing header: %w", err)
 	}
 
+	currTimestamp := time.Now().Unix()
+
 	// Generate numOfDataLines lines of data
 	for i := 1; i <= numOfDataLines; i++ {
 		// Generate random metrics data
 		metric := telemetrics.MetricRecord{
+			Timestamp:     currTimestamp,
 			SwitchID:      fmt.Sprintf("sw%d", i),
 			BandwidthMbps: rand.Float64() * 10000, // Random bandwidth up to 10 Gbps
 			LatencyMs:     rand.Float64() * 5000,  // Random latency up to 5 seconds
@@ -77,6 +80,7 @@ func (cm *CSVMetrics) GetCSVMetrics() (*CSVMetricsResponse, error) {
 		}
 
 		row := []string{
+			fmt.Sprintf("%d", metric.Timestamp),
 			metric.SwitchID,
 			fmt.Sprintf("%.2f", metric.BandwidthMbps),
 			fmt.Sprintf("%.2f", metric.LatencyMs),
