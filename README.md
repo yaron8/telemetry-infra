@@ -1,5 +1,32 @@
 # Telemetry Infrastructure
 
+## Table of Contents
+
+- [About](#about)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Running the System](#running-the-system)
+  - [Testing the APIs](#testing-the-apis)
+- [Key Features & Technical Highlights](#key-features--technical-highlights)
+  - [High-Performance Architecture](#high-performance-architecture)
+  - [Data Ingestion & Processing](#data-ingestion--processing)
+  - [Data Storage & Retrieval](#data-storage--retrieval)
+  - [Reliability & Quality Assurance](#reliability--quality-assurance)
+  - [Configuration Management](#configuration-management)
+  - [Deployment & Development](#deployment--development)
+- [Design and Architecture](#design-and-architecture)
+  - [High-Level Design](#high-level-design)
+  - [Detailed Architecture](#detailed-architecture)
+  - [Sequence Diagrams](#sequence-diagrams)
+- [Why Redis?](#why-redis)
+- [Performance Results](#performance-results)
+  - [Setup](#setup)
+  - [Running Performance Tests](#running-performance-tests)
+  - [Results](#results)
+- [Alternative Architecture Approaches](#alternative-architecture-approaches)
+  - [Architecture 1: Airflow-Based ETL Pipeline](#architecture-1-airflow-based-etl-pipeline)
+  - [Architecture 2: Event-Driven Architecture with Kafka](#architecture-2-event-driven-architecture-with-kafka)
+
 ## About
 
 This project provides a high-performance telemetry infrastructure for network metrics management. It consists of two main services:
