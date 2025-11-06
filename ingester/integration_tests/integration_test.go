@@ -117,7 +117,7 @@ func (s *IntegrationTestSuite) TestListMetricsEndpoint_CheckSwitchExists() {
 	}
 }
 
-// TestGetMetricEndpoint tests the /telemetry/GetMetric endpoint
+// TestGetMetricEndpoint_MetricLatencyMs tests the /telemetry/GetMetric endpoint with latency_ms metric
 func (s *IntegrationTestSuite) TestGetMetricEndpoint_MetricLatencyMs() {
 	client := &http.Client{
 		Timeout: 5 * time.Second,
@@ -142,4 +142,80 @@ func (s *IntegrationTestSuite) TestGetMetricEndpoint_MetricLatencyMs() {
 	// Assert the value is float64 and >= 0
 	assert.IsType(s.T(), float64(0), latency, "Response should be float64")
 	assert.GreaterOrEqual(s.T(), latency, float64(0), "latency_ms should be greater than or equal to 0")
+}
+
+// TestGetMetricEndpoint_MetricPacketErrors tests the /telemetry/GetMetric endpoint with packet_errors metric
+func (s *IntegrationTestSuite) TestGetMetricEndpoint_MetricPacketErrors() {
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	resp, err := client.Get(ingesterBaseURL + "/telemetry/GetMetric?switch_id=sw5&metric=packet_errors")
+	s.Require().NoError(err, "Failed to make request to /telemetry/GetMetric endpoint")
+	defer resp.Body.Close()
+
+	// Assert status code is 200
+	assert.Equal(s.T(), http.StatusOK, resp.StatusCode, "Expected status code 200")
+
+	// Read response body
+	bodyBytes, err := io.ReadAll(resp.Body)
+	s.Require().NoError(err, "Failed to read response body")
+
+	// Parse JSON response as int
+	var packetErrors int
+	err = json.Unmarshal(bodyBytes, &packetErrors)
+	s.Require().NoError(err, "Failed to parse response as float64")
+
+	// Assert the value is int and >= 0
+	assert.IsType(s.T(), int(0), packetErrors, "Response should be int")
+	assert.GreaterOrEqual(s.T(), packetErrors, int(0), "packet_errors should be greater than or equal to 0")
+}
+
+// TestGetMetricEndpoint_MetricBandwidthMbps tests the /telemetry/GetMetric endpoint with bandwidth_mbps metric
+func (s *IntegrationTestSuite) TestGetMetricEndpoint_MetricBandwidthMbps() {
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	resp, err := client.Get(ingesterBaseURL + "/telemetry/GetMetric?switch_id=sw5&metric=bandwidth_mbps")
+	s.Require().NoError(err, "Failed to make request to /telemetry/GetMetric endpoint")
+	defer resp.Body.Close()
+
+	// Assert status code is 200
+	assert.Equal(s.T(), http.StatusOK, resp.StatusCode, "Expected status code 200")
+
+	// Read response body
+	bodyBytes, err := io.ReadAll(resp.Body)
+	s.Require().NoError(err, "Failed to read response body")
+
+	// Parse JSON response as float64
+	var bandwidth float64
+	err = json.Unmarshal(bodyBytes, &bandwidth)
+	s.Require().NoError(err, "Failed to parse response as float64")
+
+	// Assert the value is float64 and >= 0
+	assert.IsType(s.T(), float64(0), bandwidth, "Response should be float64")
+	assert.GreaterOrEqual(s.T(), bandwidth, float64(0), "bandwidth_mbps should be greater than or equal to 0")
+}
+
+// TestGetMetricEndpoint_UnknownSwitchId tests the /telemetry/GetMetric endpoint with unknown switch_id
+func (s *IntegrationTestSuite) TestGetMetricEndpoint_UnknownSwitchId() {
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	resp, err := client.Get(ingesterBaseURL + "/telemetry/GetMetric?switch_id=unknown_sw&metric=bandwidth_mbps")
+	s.Require().NoError(err, "Failed to make request to /telemetry/GetMetric endpoint")
+	defer resp.Body.Close()
+
+	// Assert status code is 404
+	assert.Equal(s.T(), http.StatusNotFound, resp.StatusCode, "Expected status code 404")
+
+	// Read response body
+	bodyBytes, err := io.ReadAll(resp.Body)
+	s.Require().NoError(err, "Failed to read response body")
+
+	// Assert the error message
+	body := string(bodyBytes)
+	assert.Equal(s.T(), "switch_id does not exist\n", body, "Expected error message 'switch_id does not exist'")
 }

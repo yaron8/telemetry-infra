@@ -23,8 +23,8 @@ func (api *APIServer) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 
 	val, err := api.dao.GetMetric(ctx, switchID, metricName)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error retrieving metric: %v", err),
-			http.StatusBadRequest)
+		http.Error(w, err.Error(),
+			http.StatusNotFound)
 		return
 	}
 

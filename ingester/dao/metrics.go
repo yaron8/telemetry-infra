@@ -140,7 +140,7 @@ func (dao *DAOMetrics) GetMetric(ctx context.Context, switchID string, metric st
 	// Get the value for this key
 	data, err := dao.redisClient.Get(ctx, key).Result()
 	if err != nil {
-		return nil, fmt.Errorf("key does not exist: %s", key)
+		return nil, fmt.Errorf("switch_id does not exist")
 	}
 
 	// Unmarshal into a map to access individual fields
